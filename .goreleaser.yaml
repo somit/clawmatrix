@@ -1,0 +1,41 @@
+version: 2
+
+builds:
+  - id: clutch
+    dir: ./clutch
+    binary: clutch
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.gatewayVersion={{.Version}}
+
+  - id: control-plane
+    dir: ./control-plane
+    binary: control-plane
+    env:
+      - CGO_ENABLED=1
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+
+archives:
+  - id: clutch
+    builds: [clutch]
+    name_template: "clutch_{{ .Os }}_{{ .Arch }}"
+  - id: control-plane
+    builds: [control-plane]
+    name_template: "control-plane_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"

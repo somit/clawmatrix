@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" fill="none" role="img" aria-label="ClawMatrix icon">
+  <rect width="128" height="128" rx="18" fill="#0F172A"/>
+  <g stroke="#334155" stroke-width="2" opacity="0.85">
+    <circle cx="64" cy="64" r="14"/>
+    <circle cx="64" cy="64" r="26"/>
+    <circle cx="64" cy="64" r="38"/>
+    <circle cx="64" cy="64" r="50"/>
+    <path d="M64 8V120"/>
+    <path d="M8 64H120"/>
+    <path d="M26 26L102 102"/>
+    <path d="M102 26L26 102"/>
+  </g>
+  <defs>
+    <g id="crab-red" stroke="#7F1D1D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="0" rx="9" ry="7" fill="#EF4444"/>
+      <path d="M-12 -2 C-16 -6 -16 2 -12 0"/>
+      <path d="M12 -2 C16 -6 16 2 12 0"/>
+      <path d="M-7 6 L-12 10"/>
+      <path d="M-3 7 L-6 12"/>
+      <path d="M3 7 L6 12"/>
+      <path d="M7 6 L12 10"/>
+    </g>
+    <g id="lobster" stroke="#92400E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="0" rx="6" ry="14" fill="#F59E0B"/>
+      <path d="M0 14 L-3 20"/>
+      <path d="M0 14 L3 20"/>
+      <path d="M-10 -6 C-18 -10 -18 -2 -12 -2"/>
+      <path d="M10 -6 C18 -10 18 -2 12 -2"/>
+      <path d="M-4 2 L-10 6"/>
+      <path d="M4 2 L10 6"/>
+    </g>
+    <g id="crab-green" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <ellipse cx="0" cy="0" rx="6" ry="5" fill="#22C55E"/>
+      <path d="M-8 -1 C-12 -4 -12 1 -8 0"/>
+      <path d="M8 -1 C12 -4 12 1 8 0"/>
+      <path d="M-5 4 L-8 7"/>
+      <path d="M5 4 L8 7"/>
+    </g>
+  </defs>
+  <g transform="translate(40 42) rotate(-18) scale(1)">
+    <use href="#crab-red"/>
+  </g>
+  <g transform="translate(92 44) rotate(20) scale(1)">
+    <use href="#lobster"/>
+  </g>
+  <g transform="translate(72 92) rotate(10) scale(0.85)">
+    <use href="#crab-green"/>
+  </g>
+</svg>

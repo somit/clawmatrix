@@ -1,0 +1,157 @@
+services:
+  control-plane:
+    build:
+      context: .
+      dockerfile: Dockerfile.control-plane
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMIN_TOKEN=admin_demo_token
+      - DB=sqlite
+      - DB_URI=/data/control-plane.db
+      - LISTEN=:8080
+      - BOOTSTRAP_CONFIG=/etc/control-plane/bootstrap.json
+    volumes:
+      - cp-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  ceo:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=http://control-plane:8080
+      - REGISTRATION_TOKEN=rt_ceo_demo_token_789
+      - AGENT_ID=ceo-id
+      - AGENT_GROUP=ceo
+      - AGENT_CMD=picoclaw agent
+      - RUNNER=picoclaw
+      - WORKSPACE_PATH=/workspace/ceo
+      - SESSIONS_PATH=/workspace/ceo/sessions
+      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/ceo
+      - PICOCLAW_AGENTS_DEFAULTS_MODEL=claude-sonnet-4-20250514
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HOST_URL=http://ceo:8080
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./agents/ceo:/workspace/ceo
+
+  marketing-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=http://control-plane:8080
+      - REGISTRATION_TOKEN=rt_marketing_demo_token_123
+      - AGENT_ID=marketing-manager-id
+      - AGENT_GROUP=marketing-manager
+      - AGENT_CMD=picoclaw agent
+      - RUNNER=picoclaw
+      - WORKSPACE_PATH=/workspace/marketing-manager
+      - SESSIONS_PATH=/workspace/marketing-manager/sessions
+      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/marketing-manager
+      - PICOCLAW_AGENTS_DEFAULTS_MODEL=claude-sonnet-4-20250514
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HOST_URL=http://marketing-manager:8080
+    ports:
+      - "9091:8080"
+    volumes:
+      - ./agents/marketing-manager:/workspace/marketing-manager
+
+  sales-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=http://control-plane:8080
+      - REGISTRATION_TOKEN=rt_sales_demo_token_456
+      - AGENT_ID=sales-manager-id
+      - AGENT_GROUP=sales-manager
+      - AGENT_CMD=picoclaw agent
+      - RUNNER=picoclaw
+      - WORKSPACE_PATH=/workspace/sales-manager
+      - SESSIONS_PATH=/workspace/sales-manager/sessions
+      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/sales-manager
+      - PICOCLAW_AGENTS_DEFAULTS_MODEL=claude-sonnet-4-20250514
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - HOST_URL=http://sales-manager:8080
+    ports:
+      - "9092:8080"
+    volumes:
+      - ./agents/sales-manager:/workspace/sales-manager
+
+  # tech-team: clutch proxy + embedded sniffer goroutine
+  tech-team:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
+    depends_on:
+      control-plane:
+        condition: service_healthy
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=http://control-plane:8080
+      - REGISTRATION_TOKEN=rt_cto_demo_token_101
+      - AGENT_ID=cto-id
+      - RUNNER=openclaw
+      - HOST_URL=http://tech-team:8080
+      - OPENCLAW_CONFIG=/root/.openclaw/openclaw.json
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+      - AGENT_TIMEOUT=10m
+      - AGENT_GATEWAY_URL=http://localhost:18789
+    ports:
+      - "9093:8080"
+    volumes:
+      - ./agents/cto:/workspace/cto
+      - ./agents/techlead:/workspace/techlead
+
+  # openclaw gateway: runs in the same network namespace as tech-team (loopback shared)
+  tech-team-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
+    network_mode: "service:tech-team"
+    depends_on:
+      tech-team:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:18789/__openclaw__/canvas/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    entrypoint: ["openclaw"]
+    environment:
+      - OPENCLAW_CONFIG=/root/.openclaw/openclaw.json
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - BRAVE_API_KEY=${BRAVE_API_KEY}
+    command: ["gateway", "run"]
+    volumes:
+      - ./agents/cto:/workspace/cto
+      - ./agents/techlead:/workspace/techlead
+    restart: unless-stopped
+
+volumes:
+  cp-data:

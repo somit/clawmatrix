@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClawMatrix — Open Source AI Agent Control Plane</title>
+  <meta name="description" content="ClawMatrix is an open source control plane for AI agent fleets. Monitor agents, control network egress, schedule tasks, and manage agent-to-agent connections — works with OpenClaw, PicoClaw, Claude Code, and any runtime.">
+  <meta name="keywords" content="AI agent management, AI agent control plane, multi-agent orchestration, AI agent monitoring, agent fleet management, open source AI agents, agent network control, Claude agent, OpenClaw, PicoClaw, agent scheduling, agent-to-agent communication, AI agent platform">
+  <link rel="canonical" href="https://clawmatrix.net">
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://clawmatrix.net">
+  <meta property="og:title" content="ClawMatrix — Open Source AI Agent Control Plane">
+  <meta property="og:description" content="Monitor agents, control network egress, schedule tasks, and manage agent-to-agent connections. Works with any agent runtime.">
+  <meta property="og:image" content="https://clawmatrix.net/og.png">
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ClawMatrix — Open Source AI Agent Control Plane">
+  <meta name="twitter:description" content="Monitor agents, control network egress, schedule tasks, and manage agent-to-agent connections. Works with any agent runtime.">
+  <meta name="twitter:image" content="https://clawmatrix.net/og.png">
+
+  <!-- Structured Data -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ClawMatrix",
+    "description": "Open source control plane for AI agent fleets. Register agents, control network egress, schedule tasks, and manage agent-to-agent connections.",
+    "url": "https://clawmatrix.net",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Linux, macOS",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "codeRepository": "https://github.com/somit/clawmatrix",
+    "license": "https://github.com/somit/clawmatrix/blob/main/LICENSE",
+    "keywords": "AI agents, multi-agent, control plane, fleet management, orchestration"
+  }
+  </script>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0F172A;
+      color: #E2E8F0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 80vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      margin-bottom: 1.5rem;
+    }
+
+    .wordmark {
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: #F8FAFC;
+      margin-bottom: 0.75rem;
+    }
+
+    .tagline {
+      font-size: 1.25rem;
+      color: #94A3B8;
+      margin-bottom: 1rem;
+      max-width: 520px;
+    }
+
+    .pitch {
+      font-size: 0.9375rem;
+      color: #64748B;
+      max-width: 480px;
+      line-height: 1.6;
+      margin-bottom: 2.5rem;
+    }
+
+    .cta {
+      display: inline-block;
+      background: #EF4444;
+      color: #fff;
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9375rem;
+      padding: 0.75rem 2rem;
+      border-radius: 6px;
+      letter-spacing: 0.02em;
+      transition: background 0.15s;
+    }
+
+    .cta:hover { background: #DC2626; }
+
+    /* Features */
+    .features {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 2rem 2rem 4rem;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+
+    .card-title {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: #F8FAFC;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-desc {
+      font-size: 0.8125rem;
+      color: #94A3B8;
+      line-height: 1.55;
+    }
+
+    .card-title .accent {
+      color: #38BDF8;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.75rem;
+      color: #475569;
+      letter-spacing: 0.05em;
+    }
+
+    @media (max-width: 720px) {
+      .features { grid-template-columns: 1fr; max-width: 400px; }
+      .wordmark { font-size: 1.5rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <!-- Logo: inlined from assets/logo.svg -->
+    <svg class="logo" viewBox="0 0 128 128" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ClawMatrix icon">
+      <rect width="128" height="128" rx="18" fill="#0F172A"/>
+      <g stroke="#334155" stroke-width="2" opacity="0.85">
+        <circle cx="64" cy="64" r="14"/>
+        <circle cx="64" cy="64" r="26"/>
+        <circle cx="64" cy="64" r="38"/>
+        <circle cx="64" cy="64" r="50"/>
+        <path d="M64 8V120"/>
+        <path d="M8 64H120"/>
+        <path d="M26 26L102 102"/>
+        <path d="M102 26L26 102"/>
+      </g>
+      <defs>
+        <g id="crab-red" stroke="#7F1D1D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="0" cy="0" rx="9" ry="7" fill="#EF4444"/>
+          <path d="M-12 -2 C-16 -6 -16 2 -12 0"/>
+          <path d="M12 -2 C16 -6 16 2 12 0"/>
+          <path d="M-7 6 L-12 10"/>
+          <path d="M-3 7 L-6 12"/>
+          <path d="M3 7 L6 12"/>
+          <path d="M7 6 L12 10"/>
+        </g>
+        <g id="lobster" stroke="#92400E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="0" cy="0" rx="6" ry="14" fill="#F59E0B"/>
+          <path d="M0 14 L-3 20"/>
+          <path d="M0 14 L3 20"/>
+          <path d="M-10 -6 C-18 -10 -18 -2 -12 -2"/>
+          <path d="M10 -6 C18 -10 18 -2 12 -2"/>
+          <path d="M-4 2 L-10 6"/>
+          <path d="M4 2 L10 6"/>
+        </g>
+        <g id="crab-green" stroke="#166534" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <ellipse cx="0" cy="0" rx="6" ry="5" fill="#22C55E"/>
+          <path d="M-8 -1 C-12 -4 -12 1 -8 0"/>
+          <path d="M8 -1 C12 -4 12 1 8 0"/>
+          <path d="M-5 4 L-8 7"/>
+          <path d="M5 4 L8 7"/>
+        </g>
+      </defs>
+      <g transform="translate(40 42) rotate(-18) scale(1)">
+        <use href="#crab-red"/>
+      </g>
+      <g transform="translate(92 44) rotate(20) scale(1)">
+        <use href="#lobster"/>
+      </g>
+      <g transform="translate(72 92) rotate(10) scale(0.85)">
+        <use href="#crab-green"/>
+      </g>
+    </svg>
+
+    <h1 class="wordmark">ClawMatrix</h1>
+    <p class="tagline">Open source control plane for AI agent fleets.</p>
+    <p class="pitch">Bring your own runner — OpenClaw, PicoClaw, Claude Code, or custom. Each agent owns its markdown files — its soul, tools, memory. ClawMatrix ties them all together: real-time monitoring, egress control, cron scheduling, and agent-to-agent connections — one dashboard for your entire multi-agent system.</p>
+    <a class="cta" href="https://github.com/somit/clawmatrix">View on GitHub</a>
+  </div>
+
+  <div class="features">
+    <div class="card">
+      <div class="card-title">Fleet dashboard</div>
+      <div class="card-desc">See every agent across deployments. Health status, latency stats, traffic counts — all in real time.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Agent connections</div>
+      <div class="card-desc">Define who can delegate to whom directly from the UI. <span class="accent">A → B</span> means A can send tasks to B. Manage your entire agent topology without touching config files.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Network allowlists</div>
+      <div class="card-desc">Domain-level egress control per agent. Wildcards supported (<span class="accent">*.googleapis.com</span>). Every request logged, blocked requests get <span class="accent">403</span>.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Cron scheduling</div>
+      <div class="card-desc">Schedule recurring or one-time messages to agents. Cron expressions, timezone support, execution history, manual triggers. Notification channels (WhatsApp, Slack) coming soon.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Workspace browser</div>
+      <div class="card-desc">Browse and edit agent files from the UI. Chat to instruct agents to modify their own workspace. Lock critical files with OS-level <span class="accent">chmod 444</span> — no prompt tricks around it.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">LLM-native API <span class="accent">/llms.txt</span></div>
+      <div class="card-desc">Point Claude Code at the URL and manage your fleet from the CLI. The API is documented in a format coding agents can read and call directly.</div>
+    </div>
+  </div>
+
+  <div class="footer">clawmatrix.net · made by <a href="https://www.somitsrivastava.com" style="color:#475569;text-decoration:underline">Somit</a></div>
+</body>
+</html>

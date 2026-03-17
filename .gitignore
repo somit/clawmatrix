@@ -1,0 +1,12 @@
+.env
+.claude/
+tmp/
+*.db
+*.db-wal
+*.db-shm
+dist/
+go.work.sum
+examples/docker-compose-multi-agent/bin/
+examples/docker-compose-wealthy-multi-agent/
+clutch/clutch
+docs/roadmap-thinking/

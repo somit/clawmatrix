@@ -1,0 +1,79 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Always runs: verify the code compiles on Linux and Mac
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: |
+            control-plane/go.sum
+            clutch/go.sum
+
+      - name: Build control-plane
+        working-directory: control-plane
+        run: CGO_ENABLED=0 go build ./...
+
+      - name: Build clutch
+        working-directory: clutch
+        run: CGO_ENABLED=0 go build ./...
+
+  # Only runs on tags: builds release binaries and publishes a GitHub Release
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache-dependency-path: |
+            control-plane/go.sum
+            clutch/go.sum
+
+      - name: Build linux/amd64
+        run: |
+          mkdir -p dist
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C control-plane -ldflags "-s -w" -o ../dist/control-plane-linux-amd64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -C clutch       -ldflags "-s -w" -o ../dist/clutch-linux-amd64 .
+
+      - name: Build linux/arm64
+        run: |
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -C control-plane -ldflags "-s -w" -o ../dist/control-plane-linux-arm64 .
+          CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -C clutch       -ldflags "-s -w" -o ../dist/clutch-linux-arm64 .
+
+      - name: Build darwin/amd64
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -C control-plane -ldflags "-s -w" -o ../dist/control-plane-darwin-amd64 .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -C clutch       -ldflags "-s -w" -o ../dist/clutch-darwin-amd64 .
+
+      - name: Build darwin/arm64 (Apple Silicon)
+        run: |
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -C control-plane -ldflags "-s -w" -o ../dist/control-plane-darwin-arm64 .
+          CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build -C clutch       -ldflags "-s -w" -o ../dist/clutch-darwin-arm64 .
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

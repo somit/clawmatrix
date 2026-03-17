@@ -1,0 +1,34 @@
+{
+  "registrations": [
+    {
+      "name": "picoclaw-ceo-office",
+      "token": "rt_ceo_demo_token_789",
+      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "ttlMinutes": -1
+    },
+    {
+      "name": "picoclaw-marketing",
+      "token": "rt_marketing_demo_token_123",
+      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "ttlMinutes": -1
+    },
+    {
+      "name": "picoclaw-sales",
+      "token": "rt_sales_demo_token_456",
+      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "ttlMinutes": -1
+    },
+    {
+      "name": "openclaw-tech-team",
+      "token": "rt_cto_demo_token_101",
+      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com", "*.aws.amazon.com", "aws.amazon.com", "instances.vantage.sh", "*.vantage.sh"],
+      "ttlMinutes": -1
+    }
+  ],
+  "connections": [
+    { "source": "ceo", "target": "cto" },
+    { "source": "ceo", "target": "marketing-manager" },
+    { "source": "ceo", "target": "sales-manager" },
+    { "source": "cto", "target": "techlead" }
+  ]
+}

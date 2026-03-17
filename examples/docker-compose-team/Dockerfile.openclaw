@@ -1,0 +1,14 @@
+FROM --platform=linux/amd64 node:22-alpine
+RUN apk add --no-cache ca-certificates git curl \
+        chromium nss freetype harfbuzz ttf-freefont \
+        udev && \
+    NODE_LLAMA_CPP_SKIP_DOWNLOAD=true npm install -g openclaw@latest
+RUN apk add --no-cache iptables
+COPY bin/clutch /usr/local/bin/clutch
+COPY config/openclaw-tech.json /root/.openclaw/openclaw.json
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /usr/local/bin/clutch /entrypoint.sh && \
+    mkdir -p /workspace/cto /workspace/techlead
+EXPOSE 8080
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["--listen", "0.0.0.0:8080"]

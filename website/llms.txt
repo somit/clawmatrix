@@ -1,0 +1,50 @@
+# ClawMatrix
+
+> Open source control plane for AI agent fleets. Register agents, control network egress, schedule tasks, and manage agent-to-agent communication — works with any agent runtime (OpenClaw, PicoClaw, Claude Code, NanoClaw, or custom).
+
+ClawMatrix is a lightweight Go server that acts as the management layer for multi-agent AI systems. A sidecar proxy called Clutch runs alongside each agent, handling registration, heartbeats, network monitoring, and request proxying — without requiring any changes to the agent itself.
+
+## Use Cases
+
+- Monitor a fleet of AI agents across environments from one dashboard
+- Control which domains each agent can reach (egress allowlist, enforced via iptables)
+- Schedule recurring tasks for agents using cron expressions
+- Define agent-to-agent delegation paths (A can send tasks to B)
+- Browse and edit agent workspaces and session history from a UI
+- Manage multi-agent systems built on OpenClaw, PicoClaw, or custom runtimes
+
+## Source & Docs
+
+- [GitHub](https://github.com/somit/clawmatrix): source code, issues, releases
+- [README](https://github.com/somit/clawmatrix/blob/main/README.md): full feature overview, architecture, configuration
+- [Dashboard Tour](https://github.com/somit/clawmatrix/blob/main/docs/dashboard.md): screenshots of every UI screen
+- [Contributing / Adding a Runtime](https://github.com/somit/clawmatrix/blob/main/CONTRIBUTING.md): how to add a new agent runtime
+
+## Examples
+
+- [Multi-agent business team](https://github.com/somit/clawmatrix/tree/main/examples/docker-compose-team): CEO, CTO, Marketing Manager, Sales Manager, Tech Lead — full Docker Compose stack
+
+## API Reference
+
+Once ClawMatrix is running, the full machine-readable API reference is at:
+
+  GET /llms.txt  on your control plane instance (e.g. https://your-cp.example.com/llms.txt)
+
+This returns a complete API reference with your base URL pre-filled, designed for LLMs (Claude, GPT, etc.) to understand and call the API directly without reading docs.
+
+## Key Concepts
+
+- **Registration** — a hosted runtime instance (one OpenClaw or PicoClaw server). Defines which domains agents are allowed to reach.
+- **Agent** — an individual AI agent process registered with the control plane. Has health status, uptime, session history.
+- **Clutch** — the sidecar proxy binary. Handles registration, heartbeats, egress enforcement, request proxying.
+- **Connection** — a defined delegation path between agents. Source agent can call `clutch delegate <target>`.
+- **Allowlist** — per-registration egress rules. Supports exact domains, wildcards (*.example.com), exact IPs, and CIDR ranges.
+- **Cron** — scheduled message delivered to an agent's session on a cron schedule or at a specific time.
+- **Sniffer** — embedded goroutine in Clutch that reads raw packets via AF_PACKET and enforces the allowlist via iptables.
+
+## Technology
+
+- Control plane: Go, SQLite (default) or PostgreSQL, embedded UI
+- Clutch (sidecar): Go, Linux (AF_PACKET + iptables for network enforcement)
+- TLS: optional Let's Encrypt via autocert, cert stored in DB
+- License: MIT

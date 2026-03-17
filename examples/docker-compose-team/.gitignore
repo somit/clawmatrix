@@ -1,0 +1,10 @@
+bin/*
+!bin/.gitkeep
+agents/**/sessions/
+agents/**/memory/
+agents/**/.openclaw/
+agents/**/.picoclaw/
+agents/**/HEARTBEAT.md
+**/.skill-origin.json
+**/_meta.json
+**/.workspace-lock.json

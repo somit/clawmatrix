@@ -1,0 +1,8 @@
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates wget
+COPY bin/control-plane /usr/local/bin/control-plane
+COPY config/bootstrap.json /etc/control-plane/bootstrap.json
+RUN chmod +x /usr/local/bin/control-plane
+VOLUME /data
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/control-plane"]
