@@ -197,6 +197,14 @@ func UserCount() (int64, error) {
 	return count, DB.Model(&User{}).Count(&count).Error
 }
 
+// LinkUserIdentity associates an external provider identity with a user.
+func LinkUserIdentity(userID uint, provider, externalID string) error {
+	identity := UserIdentity{UserID: userID, Provider: provider, ExternalID: externalID}
+	return DB.Where(UserIdentity{UserID: userID, Provider: provider}).
+		Assign(UserIdentity{ExternalID: externalID}).
+		FirstOrCreate(&identity).Error
+}
+
 // GetUserByExternalIdentity resolves an external provider identity to a user.
 func GetUserByExternalIdentity(provider, externalID string) (*User, error) {
 	var identity UserIdentity

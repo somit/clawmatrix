@@ -7,8 +7,8 @@ import (
 	"control-plane/internal/ui"
 )
 
-func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
-	h := NewHandlers(hub, scheduler)
+func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler {
+	h := NewHandlers(hub, scheduler, oidc)
 
 	mux := http.NewServeMux()
 
@@ -26,6 +26,11 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 	// Auth
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("GET /auth/me", h.withAuth(h.Me))
+
+	// OIDC — public, no auth required
+	mux.HandleFunc("GET /auth/oidc/config", h.OIDCProviderConfig)
+	mux.HandleFunc("GET /auth/oidc/start", h.OIDCStart)
+	mux.HandleFunc("GET /auth/oidc/callback", h.OIDCCallback)
 
 	// Users
 	mux.HandleFunc("GET /users", h.withPerm(database.PermManageUsers, h.ListUsers))

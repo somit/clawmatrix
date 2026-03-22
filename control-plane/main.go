@@ -57,7 +57,21 @@ func main() {
 
 	go worker.StaleLoop(hub)
 
-	router := api.NewRouter(hub, scheduler)
+	oidcCfg, err := api.NewOIDCConfig(
+		cfg.OIDCIssuerURL,
+		cfg.OIDCClientID,
+		cfg.OIDCClientSecret,
+		cfg.OIDCRedirectBaseURL,
+		cfg.OIDCButtonLabel,
+	)
+	if err != nil {
+		log.Fatalf("OIDC init: %v", err)
+	}
+	if oidcCfg != nil {
+		log.Printf("OIDC enabled (issuer: %s)", cfg.OIDCIssuerURL)
+	}
+
+	router := api.NewRouter(hub, scheduler, oidcCfg)
 	fmt.Println(`
 +--------------------+
 |    ClawMatrix      |

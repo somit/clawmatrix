@@ -84,6 +84,45 @@ function renderUserInfo() {
   el.textContent = currentUser.username + (currentUser.system_role ? ' (' + currentUser.system_role + ')' : '');
 }
 
+// OIDC — handle hash fragment on page load (#oidc_token=... or #oidc_error=...)
+(function() {
+  const hash = window.location.hash;
+  if (hash.startsWith('#oidc_token=')) {
+    token = hash.slice('#oidc_token='.length);
+    localStorage.setItem('cp_token', token);
+    history.replaceState(null, '', '/');
+  } else if (hash.startsWith('#oidc_error=')) {
+    const code = hash.slice('#oidc_error='.length);
+    history.replaceState(null, '', '/');
+    document.getElementById('login-screen').style.display = 'flex';
+    const msgs = {
+      not_registered: 'Your account is not registered. Ask an admin to add you.',
+      invalid_state:  'Login session expired. Please try again.',
+    };
+    document.getElementById('login-error').textContent = msgs[code] || 'SSO login failed (' + code + ')';
+    initOIDCButton();
+    return;
+  }
+})();
+
+function doOIDCLogin() {
+  window.location.href = '/auth/oidc/start';
+}
+
+function initOIDCButton() {
+  fetch('/auth/oidc/config')
+    .then(r => r.json())
+    .then(cfg => {
+      if (cfg.enabled) {
+        document.getElementById('oidc-divider').style.display = '';
+        const btn = document.getElementById('oidc-btn');
+        btn.textContent = cfg.button_label;
+        btn.style.display = '';
+      }
+    })
+    .catch(() => {});
+}
+
 // Auto-login if token exists
 if (token) {
   fetch('/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
@@ -92,6 +131,7 @@ if (token) {
     .catch(() => doLogout());
 } else {
   document.getElementById('login-screen').style.display = 'flex';
+  initOIDCButton();
 }
 
 // --- SSE ---
