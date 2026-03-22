@@ -285,7 +285,7 @@ function initTabFromHash() {
     if (agentId) sessRestoreFromHash(agentId, fileName);
     return;
   }
-  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'users'].includes(hash)) {
+  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'humans', 'roles'].includes(hash)) {
     showTab(hash);
   }
 }

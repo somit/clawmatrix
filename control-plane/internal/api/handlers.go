@@ -2078,9 +2078,10 @@ func agentProfileName(a *database.Agent) string {
 
 func agentToJSON(a *database.Agent) J {
 	j := J{
-		"id":     a.ID,
-		"name":   agentProfileName(a),
-		"status": a.Status,
+		"id":           a.ID,
+		"name":         agentProfileName(a),
+		"registration": database.GetAgentRegistrationName(a),
+		"status":       a.Status,
 		"stats": J{
 			"allowed": a.StatsAllowed, "blocked": a.StatsBlocked,
 			"avgMs": a.StatsAvgMs, "minMs": a.StatsMinMs, "maxMs": a.StatsMaxMs,
