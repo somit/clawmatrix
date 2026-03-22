@@ -205,6 +205,20 @@ func LinkUserIdentity(userID uint, provider, externalID string) error {
 		FirstOrCreate(&identity).Error
 }
 
+// ListUserIdentities returns all external identities linked to a user.
+func ListUserIdentities(userID uint) ([]UserIdentity, error) {
+	var identities []UserIdentity
+	if err := DB.Where("user_id = ?", userID).Find(&identities).Error; err != nil {
+		return nil, err
+	}
+	return identities, nil
+}
+
+// UnlinkUserIdentity removes a specific provider identity from a user.
+func UnlinkUserIdentity(userID uint, provider string) error {
+	return DB.Where("user_id = ? AND provider = ?", userID, provider).Delete(&UserIdentity{}).Error
+}
+
 // GetUserByExternalIdentity resolves an external provider identity to a user.
 func GetUserByExternalIdentity(provider, externalID string) (*User, error) {
 	var identity UserIdentity

@@ -184,6 +184,65 @@ func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, J{"ok": true})
 }
 
+// --- User Identities ---
+
+func (h *Handlers) ListUserIdentities(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	identities, err := database.ListUserIdentities(uint(id))
+	if err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	out := make([]J, len(identities))
+	for i, ident := range identities {
+		out[i] = J{"provider": ident.Provider, "external_id": ident.ExternalID}
+	}
+	respond(w, 200, out)
+}
+
+func (h *Handlers) LinkUserIdentity(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	var req struct {
+		Provider   string `json:"provider"`
+		ExternalID string `json:"external_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Provider == "" || req.ExternalID == "" {
+		respond(w, 400, J{"error": "provider and external_id required"})
+		return
+	}
+	if err := database.LinkUserIdentity(uint(id), req.Provider, req.ExternalID); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
+func (h *Handlers) UnlinkUserIdentity(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	provider := r.PathValue("provider")
+	if provider == "" {
+		respond(w, 400, J{"error": "provider required"})
+		return
+	}
+	if err := database.UnlinkUserIdentity(uint(id), provider); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
 // --- Roles ---
 
 func (h *Handlers) ListRoles(w http.ResponseWriter, r *http.Request) {

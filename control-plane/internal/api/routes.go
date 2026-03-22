@@ -41,6 +41,9 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 	mux.HandleFunc("GET /users/{id}", h.withPerm(database.PermManageUsers, h.GetUser))
 	mux.HandleFunc("PUT /users/{id}", h.withPerm(database.PermManageUsers, h.UpdateUser))
 	mux.HandleFunc("DELETE /users/{id}", h.withPerm(database.PermManageUsers, h.DeleteUser))
+	mux.HandleFunc("GET /users/{id}/identities", h.withPerm(database.PermManageUsers, h.ListUserIdentities))
+	mux.HandleFunc("POST /users/{id}/identities", h.withPerm(database.PermManageUsers, h.LinkUserIdentity))
+	mux.HandleFunc("DELETE /users/{id}/identities/{provider}", h.withPerm(database.PermManageUsers, h.UnlinkUserIdentity))
 
 	// Roles
 	mux.HandleFunc("GET /roles", h.withAuth(h.ListRoles))

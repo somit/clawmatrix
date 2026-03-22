@@ -41,15 +41,16 @@ function renderUsers(users) {
   }
   el.innerHTML = `
     <table class="data-table">
-      <thead><tr><th>ID</th><th>Username</th><th>System Role</th><th>Actions</th></tr></thead>
+      <thead><tr><th>ID</th><th>Username</th><th>Email</th><th>System Role</th><th>Actions</th></tr></thead>
       <tbody>
         ${users.map(u => `
           <tr>
             <td>${esc(String(u.id))}</td>
             <td>${esc(u.username)}</td>
+            <td>${u.email ? `<span class="muted">${esc(u.email)}</span>` : '<span class="muted">—</span>'}</td>
             <td>${u.system_role ? `<span class="pill">${esc(u.system_role)}</span>` : '<span class="muted">—</span>'}</td>
             <td>
-              <button class="btn btn-sm" onclick="openEditUserModal(${u.id}, '${esc(u.username)}')">Edit</button>
+              <button class="btn btn-sm" onclick="openEditUserModal(${u.id}, '${esc(u.username)}', '${esc(u.email||'')}', '${esc(u.system_role||'')}')">Edit</button>
               <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id}, '${esc(u.username)}')">Delete</button>
             </td>
           </tr>
@@ -101,6 +102,10 @@ async function openCreateUserModal() {
           <input id="m-password" type="password" placeholder="password" />
         </div>
         <div class="form-group">
+          <label>Email <span class="muted">(optional)</span></label>
+          <input id="m-email" type="email" placeholder="user@example.com" />
+        </div>
+        <div class="form-group">
           <label>System Role</label>
           <select id="m-role">
             <option value="">None (member only)</option>
@@ -119,6 +124,7 @@ async function openCreateUserModal() {
 async function submitCreateUser() {
   const username = document.getElementById('m-username').value.trim();
   const password = document.getElementById('m-password').value;
+  const email = document.getElementById('m-email').value.trim();
   const roleVal = document.getElementById('m-role').value;
   const err = document.getElementById('m-error');
   if (!username || !password) { err.textContent = 'Username and password required'; return; }
@@ -126,6 +132,7 @@ async function submitCreateUser() {
     await api('POST', '/users', {
       username,
       password,
+      email: email || null,
       system_role_id: roleVal ? parseInt(roleVal) : null
     });
     closeModal();
@@ -137,23 +144,41 @@ async function submitCreateUser() {
 
 // --- Edit User Modal ---
 
-async function openEditUserModal(id, username) {
+async function openEditUserModal(id, username, email, currentRole) {
   await ensureRolesLoaded();
   const systemRoles = rolesData.filter(r => r.Scope === 'system');
+  let identities = [];
+  try { identities = await api('GET', `/users/${id}/identities`); } catch(_) {}
+
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-overlay" onclick="closeModal()">
       <div class="modal" onclick="event.stopPropagation()">
         <h3>Edit User: ${esc(username)}</h3>
         <div class="form-group">
+          <label>Email</label>
+          <input id="m-email" type="email" placeholder="user@example.com" value="${esc(email)}" />
+        </div>
+        <div class="form-group">
           <label>New Password <span class="muted">(leave blank to keep)</span></label>
-          <input id="m-password" type="password" placeholder="new password" autofocus />
+          <input id="m-password" type="password" placeholder="new password" />
         </div>
         <div class="form-group">
           <label>System Role</label>
           <select id="m-role">
             <option value="">None (member only)</option>
-            ${systemRoles.map(r => `<option value="${r.ID}">${esc(r.Name)}</option>`).join('')}
+            ${systemRoles.map(r => `<option value="${r.ID}" ${r.Name === currentRole ? 'selected' : ''}>${esc(r.Name)}</option>`).join('')}
           </select>
+        </div>
+        <div class="form-group">
+          <label>Linked Identities</label>
+          <div id="m-identities" class="identities-list">
+            ${renderIdentitiesList(id, identities)}
+          </div>
+          <div class="identities-add" style="display:flex;gap:8px;margin-top:8px">
+            <input id="m-ident-provider" type="text" placeholder="provider (e.g. oidc)" style="flex:1" />
+            <input id="m-ident-extid" type="text" placeholder="external ID" style="flex:2" />
+            <button class="btn btn-sm btn-primary" onclick="addIdentity(${id})">Link</button>
+          </div>
         </div>
         <div class="modal-error" id="m-error"></div>
         <div class="modal-actions">
@@ -164,14 +189,53 @@ async function openEditUserModal(id, username) {
     </div>`;
 }
 
+function renderIdentitiesList(userId, identities) {
+  if (!identities || !identities.length) return '<span class="muted" style="font-size:13px">No linked identities</span>';
+  return identities.map(i => `
+    <div class="identity-row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <span class="pill">${esc(i.provider)}</span>
+      <span class="muted" style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis">${esc(i.external_id)}</span>
+      <button class="btn btn-sm btn-danger" onclick="removeIdentity(${userId}, '${esc(i.provider)}')">Remove</button>
+    </div>
+  `).join('');
+}
+
+async function addIdentity(userId) {
+  const provider = document.getElementById('m-ident-provider').value.trim();
+  const externalId = document.getElementById('m-ident-extid').value.trim();
+  const err = document.getElementById('m-error');
+  if (!provider || !externalId) { err.textContent = 'Provider and external ID required'; return; }
+  try {
+    await api('POST', `/users/${userId}/identities`, { provider, external_id: externalId });
+    const identities = await api('GET', `/users/${userId}/identities`);
+    document.getElementById('m-identities').innerHTML = renderIdentitiesList(userId, identities);
+    document.getElementById('m-ident-provider').value = '';
+    document.getElementById('m-ident-extid').value = '';
+    err.textContent = '';
+  } catch(e) {
+    err.textContent = e.message;
+  }
+}
+
+async function removeIdentity(userId, provider) {
+  try {
+    await api('DELETE', `/users/${userId}/identities/${encodeURIComponent(provider)}`);
+    const identities = await api('GET', `/users/${userId}/identities`);
+    document.getElementById('m-identities').innerHTML = renderIdentitiesList(userId, identities);
+  } catch(e) {
+    document.getElementById('m-error').textContent = e.message;
+  }
+}
+
 async function submitEditUser(id) {
+  const email = document.getElementById('m-email').value.trim();
   const password = document.getElementById('m-password').value;
   const roleVal = document.getElementById('m-role').value;
   const err = document.getElementById('m-error');
   const body = {};
+  if (email !== undefined) body.email = email || '';  // empty string → null on server
   if (password) body.password = password;
   if (roleVal !== undefined) body.system_role_id = roleVal ? parseInt(roleVal) : null;
-  if (!Object.keys(body).length) { err.textContent = 'Nothing to update'; return; }
   try {
     await api('PUT', `/users/${id}`, body);
     closeModal();
