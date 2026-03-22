@@ -25,61 +25,65 @@ function parseLabelsText(text) {
 
 // --- Registrations ---
 
+function showRegistrationsSubtab(name, btn) {
+  document.querySelectorAll('#registrations-tab .subtab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('registrations-list').style.display = name === 'active' ? '' : 'none';
+  document.getElementById('registrations-archived-list').style.display = name === 'archived' ? '' : 'none';
+}
+
+function renderRegistrationCard(t) {
+  const labelHtml = renderLabels(t.labels);
+  return `
+    <div class="card">
+      <div class="card-header">
+        <h3>${esc(t.name)}</h3>
+        <div class="card-actions">
+          <button class="btn btn-sm" onclick="showEditRegistrationModal('${esc(t.name)}')">Edit</button>
+          ${t.totalRegistered > 0
+            ? (t.archived
+              ? `<button class="btn btn-sm btn-green" onclick="toggleArchiveRegistration('${esc(t.name)}', false)">Unarchive</button>`
+              : `<button class="btn btn-sm btn-yellow" onclick="toggleArchiveRegistration('${esc(t.name)}', true)">Archive</button>`)
+            : `<button class="btn btn-sm btn-red" onclick="confirmDeleteRegistration('${esc(t.name)}')">Delete</button>`
+          }
+        </div>
+      </div>
+      ${t.description ? `<div class="card-desc">${esc(t.description)}</div>` : '<div style="margin-bottom:14px"></div>'}
+      ${labelHtml ? `<div class="card-labels">${labelHtml}</div>` : ''}
+      <div class="card-stats">
+        <div class="card-stat"><div class="label">Agents</div><div class="val">${t.agents}</div></div>
+        <div class="card-stat"><div class="label">TTL</div><div class="val">${t.ttlMinutes === -1 ? '&infin;' : t.ttlMinutes + 'm'}</div></div>
+        <div class="card-stat"><div class="label">Total Registered</div><div class="val">${t.totalRegistered}</div></div>
+        <div class="card-stat"><div class="label">Allowlist Rules</div><div class="val">${t.egressAllowlist ? t.egressAllowlist.length : 0}</div></div>
+      </div>
+      ${t.egressAllowlist && t.egressAllowlist.length ? `
+        <div class="card-allowlist">
+          ${t.egressAllowlist.map(a => `<span class="card-allowlist-tag">${esc(a)}</span>`).join('')}
+        </div>
+      ` : ''}
+      <div class="card-footer">
+        <span>Updated ${timeAgo(t.updatedAt)}</span>
+        <span class="monitor-status ${t.monitoringEnabled ? 'on' : 'off'}"><span class="dot"></span>${t.monitoringEnabled ? 'Network Monitoring Active' : 'Network Monitoring Off'}</span>
+      </div>
+    </div>
+  `;
+}
+
 async function loadRegistrations() {
   try {
     const regs = await api('GET', '/agent-registrations');
-    if (!regs || !regs.length) {
-      document.getElementById('registrations-list').innerHTML = '<div class="empty">No registrations yet. Create one to get started.</div>';
-      return;
-    }
-    registrationsData = regs;
-    document.getElementById('registrations-list').innerHTML = regs.map(t => {
-      const labelHtml = renderLabels(t.labels);
-      return `
-      <div class="card ${t.archived ? 'archived' : ''}">
-        <div class="card-header">
-          <h3>${esc(t.name)}${t.archived ? ' <span class="badge" style="background:rgba(139,143,163,0.15);color:var(--muted)">archived</span>' : ''}</h3>
-          <div class="card-actions">
-            <button class="btn btn-sm" onclick="showEditRegistrationModal('${esc(t.name)}')">Edit</button>
-            ${t.totalRegistered > 0
-              ? (t.archived
-                ? `<button class="btn btn-sm btn-green" onclick="toggleArchiveRegistration('${esc(t.name)}', false)">Unarchive</button>`
-                : `<button class="btn btn-sm btn-yellow" onclick="toggleArchiveRegistration('${esc(t.name)}', true)">Archive</button>`)
-              : `<button class="btn btn-sm btn-red" onclick="confirmDeleteRegistration('${esc(t.name)}')">Delete</button>`
-            }
-          </div>
-        </div>
-        ${t.description ? `<div class="card-desc">${esc(t.description)}</div>` : '<div style="margin-bottom:14px"></div>'}
-        ${labelHtml ? `<div class="card-labels">${labelHtml}</div>` : ''}
-        <div class="card-stats">
-          <div class="card-stat">
-            <div class="label">Agents</div>
-            <div class="val">${t.agents}</div>
-          </div>
-          <div class="card-stat">
-            <div class="label">TTL</div>
-            <div class="val">${t.ttlMinutes === -1 ? '&infin;' : t.ttlMinutes + 'm'}</div>
-          </div>
-          <div class="card-stat">
-            <div class="label">Total Registered</div>
-            <div class="val">${t.totalRegistered}</div>
-          </div>
-          <div class="card-stat">
-            <div class="label">Allowlist Rules</div>
-            <div class="val">${t.egressAllowlist ? t.egressAllowlist.length : 0}</div>
-          </div>
-        </div>
-        ${t.egressAllowlist && t.egressAllowlist.length ? `
-          <div class="card-allowlist">
-            ${t.egressAllowlist.map(a => `<span class="card-allowlist-tag">${esc(a)}</span>`).join('')}
-          </div>
-        ` : ''}
-        <div class="card-footer">
-          <span>Updated ${timeAgo(t.updatedAt)}</span>
-          <span class="monitor-status ${t.monitoringEnabled ? 'on' : 'off'}"><span class="dot"></span>${t.monitoringEnabled ? 'Network Monitoring Active' : 'Network Monitoring Off'}</span>
-        </div>
-      </div>
-    `}).join('');
+    registrationsData = regs || [];
+
+    const active = registrationsData.filter(r => !r.archived);
+    const archived = registrationsData.filter(r => r.archived);
+
+    document.getElementById('registrations-list').innerHTML = active.length
+      ? active.map(renderRegistrationCard).join('')
+      : '<div class="empty">No registrations yet. Create one to get started.</div>';
+
+    document.getElementById('registrations-archived-list').innerHTML = archived.length
+      ? archived.map(renderRegistrationCard).join('')
+      : '<div class="empty">No archived registrations.</div>';
 
     updateRegistrationFilters(regs);
   } catch(e) {
@@ -236,7 +240,11 @@ async function deleteRegistration(name) {
 async function toggleArchiveRegistration(name, archived) {
   try {
     await api('PUT', '/agent-registrations/' + encodeURIComponent(name) + '/archive', { archived });
-    loadRegistrations();
+    await loadRegistrations();
+    // Switch to the relevant subtab after action
+    const targetTab = archived ? 'archived' : 'active';
+    const btn = document.getElementById(`subtab-regs-${targetTab}`);
+    if (btn) showRegistrationsSubtab(targetTab, btn);
   } catch(e) {
     alert(e.message);
   }
