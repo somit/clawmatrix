@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - ADMIN_TOKEN=admin_demo_token
+      - JWT_SECRET=change-me-in-production
       - DB=sqlite
       - DB_URI=/data/control-plane.db
       - LISTEN=:8080
