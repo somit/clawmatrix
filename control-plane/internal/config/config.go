@@ -12,11 +12,11 @@ type Config struct {
 	TLSDomain string // e.g. "cp.example.com"
 	TLSEmail  string // optional, for LE expiry notifications
 	// OIDC — optional; any compliant provider (Google, Okta, Keycloak, etc.)
-	OIDCIssuerURL      string // e.g. "https://accounts.google.com"
-	OIDCClientID       string
-	OIDCClientSecret   string
+	OIDCIssuerURL       string // e.g. "https://accounts.google.com"
+	OIDCClientID        string
+	OIDCClientSecret    string
 	OIDCRedirectBaseURL string // e.g. "https://cp.example.com" (no trailing slash)
-	OIDCButtonLabel    string // e.g. "Sign in with Google" (default: "Sign in with SSO")
+	OIDCProvider        string // google | github | microsoft | okta | keycloak | custom
 }
 
 func Load() *Config {
@@ -44,7 +44,7 @@ func Load() *Config {
 		OIDCClientID:        os.Getenv("OIDC_CLIENT_ID"),
 		OIDCClientSecret:    os.Getenv("OIDC_CLIENT_SECRET"),
 		OIDCRedirectBaseURL: os.Getenv("OIDC_REDIRECT_BASE_URL"),
-		OIDCButtonLabel:     envOr("OIDC_BUTTON_LABEL", "Sign in with SSO"),
+		OIDCProvider:        envOr("OIDC_PROVIDER", "custom"),
 	}
 }
 

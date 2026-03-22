@@ -62,7 +62,7 @@ func main() {
 		cfg.OIDCClientID,
 		cfg.OIDCClientSecret,
 		cfg.OIDCRedirectBaseURL,
-		cfg.OIDCButtonLabel,
+		cfg.OIDCProvider,
 	)
 	if err != nil {
 		log.Fatalf("OIDC init: %v", err)

@@ -13,9 +13,21 @@ import (
 	"control-plane/internal/database"
 )
 
+// oidcProviderMeta holds display metadata for known providers.
+var oidcProviderMeta = map[string]struct{ label, icon string }{
+	"google":    {"Sign in with Google", "google"},
+	"github":    {"Sign in with GitHub", "github"},
+	"microsoft": {"Sign in with Microsoft", "microsoft"},
+	"okta":      {"Sign in with Okta", "okta"},
+	"keycloak":  {"Sign in with Keycloak", "keycloak"},
+	"custom":    {"Sign in with SSO", ""},
+}
+
 // OIDCConfig holds provider settings. Nil means OIDC is disabled.
 type OIDCConfig struct {
+	Provider     string
 	ButtonLabel  string
+	ButtonIcon   string
 	clientID     string
 	clientSecret string
 	redirectBase string
@@ -24,24 +36,30 @@ type OIDCConfig struct {
 }
 
 // NewOIDCConfig initialises the OIDC provider via discovery. Returns nil if issuerURL is empty.
-func NewOIDCConfig(issuerURL, clientID, clientSecret, redirectBase, buttonLabel string) (*OIDCConfig, error) {
+func NewOIDCConfig(issuerURL, clientID, clientSecret, redirectBase, providerName string) (*OIDCConfig, error) {
 	if issuerURL == "" || clientID == "" {
 		return nil, nil
 	}
-	provider, err := gooidc.NewProvider(context.Background(), issuerURL)
+	oidcProvider, err := gooidc.NewProvider(context.Background(), issuerURL)
 	if err != nil {
 		return nil, err
 	}
+	meta, ok := oidcProviderMeta[providerName]
+	if !ok {
+		meta = oidcProviderMeta["custom"]
+	}
 	cfg := &OIDCConfig{
-		ButtonLabel:  buttonLabel,
+		Provider:     providerName,
+		ButtonLabel:  meta.label,
+		ButtonIcon:   meta.icon,
 		clientID:     clientID,
 		clientSecret: clientSecret,
 		redirectBase: redirectBase,
-		provider:     provider,
+		provider:     oidcProvider,
 		oauth2Cfg: &oauth2.Config{
 			ClientID:     clientID,
 			ClientSecret: clientSecret,
-			Endpoint:     provider.Endpoint(),
+			Endpoint:     oidcProvider.Endpoint(),
 			Scopes:       []string{gooidc.ScopeOpenID, "email", "profile"},
 		},
 	}
@@ -66,7 +84,12 @@ func (h *Handlers) OIDCProviderConfig(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, J{"enabled": false})
 		return
 	}
-	respond(w, 200, J{"enabled": true, "button_label": h.oidc.ButtonLabel})
+	respond(w, 200, J{
+		"enabled":      true,
+		"provider":     h.oidc.Provider,
+		"button_label": h.oidc.ButtonLabel,
+		"button_icon":  h.oidc.ButtonIcon,
+	})
 }
 
 // OIDCStart — GET /auth/oidc/start
