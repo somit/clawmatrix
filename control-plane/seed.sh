@@ -1,17 +1,30 @@
 #!/bin/bash
-# Seed script — recreates initial templates after a DB reset.
-# Usage: ./seed.sh [base_url] [admin_token]
+# Seed script — recreates initial profiles after a DB reset.
+# Usage: ./seed.sh [base_url] [username] [password]
 #
-# Defaults assume local dev (.env values).
+# Defaults assume local dev.
 
 BASE_URL="${1:-http://localhost:8080}"
-ADMIN_TOKEN="${2:-agent-manager-local-dev}"
+USERNAME="${2:-admin}"
+PASSWORD="${3:-admin}"
+
+# Login to get JWT token
+echo "Logging in as ${USERNAME}..."
+login_resp=$(curl -s -X POST "${BASE_URL}/auth/login" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"${USERNAME}\",\"password\":\"${PASSWORD}\"}")
+TOKEN=$(echo "$login_resp" | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null)
+if [ -z "$TOKEN" ]; then
+  echo "Login failed: $login_resp"
+  exit 1
+fi
+echo "Logged in."
 
 api() {
   local method="$1" path="$2" body="$3"
   local resp
   resp=$(curl -s -w "\n%{http_code}" -X "$method" "${BASE_URL}${path}" \
-    -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+    -H "Authorization: Bearer ${TOKEN}" \
     -H "Content-Type: application/json" \
     ${body:+-d "$body"})
   local code=$(echo "$resp" | tail -1)
@@ -34,15 +47,14 @@ done
 
 echo "Seeding ${BASE_URL} ..."
 
-# --- Templates ---
+# --- Agent Profiles ---
 
-echo -n "  ratchet template... "
-result=$(api POST /agent-templates '{
-  "name": "ratchet",
-  "description": "SRE monitoring agent",
-  "labels": {"env": "prod"},
-  "allowlist": ["*.googleapis.com"],
-  "maxRunners": 1
+echo -n "  marketing-agent profile... "
+result=$(api POST /agent-profiles '{
+  "name": "marketing-agent",
+  "description": "Marketing agent profile",
+  "maxCount": 1,
+  "ttlMinutes": -1
 }')
 if [ $? -eq 0 ]; then
   echo "done"
@@ -50,15 +62,15 @@ else
   echo "$result"
 fi
 
-# Add more templates here as needed:
-# echo -n "  another-template... "
-# api POST /agent-templates '{ ... }'
+# Add more profiles here as needed:
+# echo -n "  another-profile... "
+# api POST /agent-profiles '{ ... }'
 # echo "done"
 
 echo ""
-echo "Template tokens:"
-api GET /agent-templates | python3 -c "
+echo "Profiles:"
+api GET /agent-profiles | python3 -c "
 import sys, json
-for t in json.load(sys.stdin):
-    print(f\"  {t['name']}: {t['token']}\")
-" 2>/dev/null || echo "  (could not list templates)"
+for p in json.load(sys.stdin):
+    print(f\"  {p['name']}: {p.get('description','')}\")
+" 2>/dev/null || echo "  (could not list profiles)"
