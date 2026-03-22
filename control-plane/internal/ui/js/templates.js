@@ -243,7 +243,7 @@ function renderProfileACLModal(profileName, acl, users, roles) {
         <div class="acl-add-row">
           <select id="acl-user">${userOptions}</select>
           <select id="acl-role">${roleOptions}</select>
-          <button class="btn btn-primary" onclick="addProfileACL('${esc(profileName)}')">Add</button>
+          <button class="btn btn-sm btn-primary" onclick="addProfileACL('${esc(profileName)}')">Add</button>
         </div>
         <div class="modal-error" id="m-error"></div>
         <div class="modal-actions">
