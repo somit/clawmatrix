@@ -87,7 +87,7 @@ func RegistrationsTab() templ.Component {
 			templ_7745c5c3_Var3 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<section id=\"registrations-tab\"><div class=\"section-header\"><h2>Registrations</h2><button class=\"btn btn-primary\" onclick=\"showCreateRegistrationModal()\">+ New Registration</button></div><div id=\"registrations-list\"></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<section id=\"registrations-tab\"><div class=\"section-header\"><h2>Registrations</h2><button class=\"btn btn-primary\" onclick=\"showCreateRegistrationModal()\">+ New Registration</button></div><div class=\"subtab-bar\"><button class=\"subtab active\" id=\"subtab-regs-active\" onclick=\"showRegistrationsSubtab('active', this)\">Active</button> <button class=\"subtab\" id=\"subtab-regs-archived\" onclick=\"showRegistrationsSubtab('archived', this)\">Archived</button></div><div id=\"registrations-list\"></div><div id=\"registrations-archived-list\" style=\"display:none\"></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
