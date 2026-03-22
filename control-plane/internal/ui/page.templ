@@ -22,8 +22,10 @@ templ Page(a Assets) {
 templ App(a Assets) {
 	<div class="app" id="app">
 		@Header()
-		@Nav()
-		@Main()
+		<div class="app-body">
+			@Nav()
+			@Main()
+		</div>
 	</div>
 	<div id="modal-root"></div>
 	<div id="chat-root"></div>
