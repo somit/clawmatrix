@@ -83,7 +83,7 @@ async function loadRegistrations() {
 
     updateRegistrationFilters(regs);
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('registrations-list').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }

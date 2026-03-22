@@ -42,7 +42,7 @@ async function loadConnections() {
     html += '</div>';
     document.getElementById('connections-list').innerHTML = html;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('connections-list').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }

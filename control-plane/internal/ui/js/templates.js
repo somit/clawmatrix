@@ -55,7 +55,7 @@ async function loadTemplates() {
     `).join('');
     document.getElementById('templates-list').innerHTML = html;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('templates-list').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }
