@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"control-plane/internal/auth"
 	"control-plane/internal/database"
 )
 
@@ -54,10 +55,11 @@ func (h *Hub) Broadcast(e Event) {
 	database.InsertAuditEvent(e.Type, string(data))
 }
 
-func (h *Hub) ServeHTTP(adminToken string) http.HandlerFunc {
+func (h *Hub) ServeHTTP() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Auth via query param (EventSource can't set headers)
-		if r.URL.Query().Get("token") != adminToken {
+		tok := r.URL.Query().Get("token")
+		if _, err := auth.Verify(tok); err != nil {
 			http.Error(w, "unauthorized", http.StatusUnauthorized)
 			return
 		}

@@ -98,7 +98,7 @@ async function loadCrons() {
 
     document.getElementById('crons-list').innerHTML = html;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('crons-list').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }

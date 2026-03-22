@@ -129,10 +129,16 @@ Grab the latest binaries for your platform from [Releases](https://github.com/so
 #### 2. Run the control plane
 
 ```bash
-ADMIN_TOKEN=your-secret-admin-token ./clawmatrix
+JWT_SECRET=your-secret ./clawmatrix
 ```
 
-Opens at http://localhost:8080. Log in with the token you set.
+Then create your first admin user:
+
+```bash
+JWT_SECRET=your-secret ./clawmatrix createadmin --username admin --password <password>
+```
+
+Opens at http://localhost:8080. Log in with the credentials you just created.
 
 #### 3. Create a registration
 
@@ -524,7 +530,7 @@ clutch crons update 42 '{"schedule":"0 10 * * 1"}'
 
 | Env var | Default | Description |
 |---------|---------|-------------|
-| `ADMIN_TOKEN` | *(required)* | Bearer token for the admin API and UI |
+| `JWT_SECRET` | *(required)* | Secret key used to sign JWT tokens |
 | `LISTEN` | `:8080` | Listen address (ignored when TLS is enabled) |
 | `DB` | `sqlite` | Database driver: `sqlite` or `postgres` |
 | `DB_URI` | `/data/control-plane.db` | SQLite path or Postgres DSN |
@@ -554,8 +560,6 @@ clutch crons update 42 '{"schedule":"0 10 * * 1"}'
 ## Roadmap
 
 Things we plan to build if this gets traction:
-
-**Multi-user dashboard** — Right now the control plane has a single admin token. We want proper user accounts so multiple managers can log in, each with their own scope: which registrations they can see, which agents they can chat with, which crons they can trigger.
 
 **Communication channels + notification groups** — Two-way communication plane for agents and humans. Admins define **channel groups** from the UI — a group is a named collection of destinations (e.g. "leadership" = WhatsApp group A + Slack user X). Any cron job can be pointed at a channel group: when the cron runs and the agent responds, the output is automatically forwarded to every destination in the group. Initial focus on WhatsApp (groups and contacts), Telegram, and Slack. No webhook plumbing needed — configure once in the UI, attach to any cron.
 

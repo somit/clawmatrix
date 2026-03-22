@@ -99,7 +99,7 @@ async function loadLogStats(type) {
 
     document.getElementById('logs-domain-stats').innerHTML = html;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('logs-domain-stats').innerHTML = '';
   }
 }
@@ -138,7 +138,7 @@ async function loadLogEntries(type, action, domain) {
     const box = el.querySelector('.log-entries-box');
     if (box) box.scrollTop = box.scrollHeight;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('logs-entries').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }

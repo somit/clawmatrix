@@ -13,6 +13,7 @@ templ Header() {
 			</div>
 			<div class="header-right">
 				<select id="tz-select" class="tz-select" onchange="onTZChange(this.value)" title="Display timezone"></select>
+				<span class="current-user" id="current-user"></span>
 				<button class="logout-btn" onclick="doLogout()">Logout</button>
 			</div>
 		</div>
@@ -31,6 +32,8 @@ templ Nav() {
 			<button onclick="showTab('logs', this)">Network Logs</button>
 			<button onclick="showTab('crons', this)">Crons</button>
 			<button onclick="showTab('events', this)">Events</button>
+			<button onclick="showTab('humans', this)">Humans</button>
+		<button onclick="showTab('roles', this)">Roles</button>
 		</div>
 	</nav>
 }
@@ -47,6 +50,8 @@ templ Main() {
 			@LogsTab()
 			@CronsTab()
 			@EventsTab()
+		@HumansTab()
+		@RolesTab()
 		</div>
 	</main>
 }

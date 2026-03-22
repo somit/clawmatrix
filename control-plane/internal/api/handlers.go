@@ -30,15 +30,14 @@ type CronScheduler interface {
 }
 
 type Handlers struct {
-	adminToken string
-	hub        *Hub
-	scheduler  CronScheduler
+	hub       *Hub
+	scheduler CronScheduler
 }
 
 type J = map[string]any
 
-func NewHandlers(adminToken string, hub *Hub, scheduler CronScheduler) *Handlers {
-	return &Handlers{adminToken: adminToken, hub: hub, scheduler: scheduler}
+func NewHandlers(hub *Hub, scheduler CronScheduler) *Handlers {
+	return &Handlers{hub: hub, scheduler: scheduler}
 }
 
 // --- Admin ---
@@ -615,6 +614,22 @@ func (h *Handlers) ListAgents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	u := userFromCtx(r)
+	visibleProfiles, isAdmin := database.VisibleProfiles(u.ID)
+	if !isAdmin {
+		profileSet := make(map[string]bool, len(visibleProfiles))
+		for _, p := range visibleProfiles {
+			profileSet[p] = true
+		}
+		filtered := agents[:0]
+		for _, a := range agents {
+			if a.AgentProfile != nil && profileSet[*a.AgentProfile] {
+				filtered = append(filtered, a)
+			}
+		}
+		agents = filtered
+	}
+
 	out := make([]J, 0, len(agents))
 	for _, a := range agents {
 		out = append(out, agentToJSON(&a))
@@ -628,6 +643,11 @@ func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 404, J{"error": "not found"})
 		return
+	}
+	if agent.AgentProfile != nil {
+		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
+			return
+		}
 	}
 	respond(w, 200, agentToJSON(agent))
 }
@@ -832,6 +852,11 @@ func (h *Handlers) ChatProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
+	if agent.AgentProfile != nil {
+		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermChatWithAgents) {
+			return
+		}
+	}
 
 	// Parse chatUrl from agent's meta
 	var meta map[string]any
@@ -908,6 +933,11 @@ func (h *Handlers) WorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
+	if agent.AgentProfile != nil {
+		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
+			return
+		}
+	}
 
 	var meta map[string]any
 	json.Unmarshal([]byte(agent.Meta), &meta)
@@ -956,6 +986,15 @@ func (h *Handlers) WorkspaceLocksProxy(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 404, J{"error": "agent not found"})
 		return
+	}
+	if agent.AgentProfile != nil {
+		perm := database.PermViewAgents
+		if r.Method == http.MethodPut {
+			perm = database.PermConfigureAgents
+		}
+		if !checkProfilePerm(w, r, *agent.AgentProfile, perm) {
+			return
+		}
 	}
 
 	var meta map[string]any
@@ -1006,6 +1045,11 @@ func (h *Handlers) SessionsProxy(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 404, J{"error": "agent not found"})
 		return
+	}
+	if agent.AgentProfile != nil {
+		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
+			return
+		}
 	}
 
 	var meta map[string]any
@@ -1144,6 +1188,22 @@ func (h *Handlers) ListCrons(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	u := userFromCtx(r)
+	visibleProfiles, isAdmin := database.VisibleProfiles(u.ID)
+	if !isAdmin {
+		profileSet := make(map[string]bool, len(visibleProfiles))
+		for _, p := range visibleProfiles {
+			profileSet[p] = true
+		}
+		filtered := jobs[:0]
+		for _, j := range jobs {
+			if profileSet[j.AgentProfileName] {
+				filtered = append(filtered, j)
+			}
+		}
+		jobs = filtered
+	}
+
 	out := make([]J, 0, len(jobs))
 	for i := range jobs {
 		out = append(out, cronToJSON(&jobs[i], h.scheduler))
@@ -1161,6 +1221,11 @@ func (h *Handlers) GetCron(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 404, J{"error": "not found"})
 		return
+	}
+	if job.AgentProfileName != "" {
+		if !checkProfilePerm(w, r, job.AgentProfileName, database.PermViewCrons) {
+			return
+		}
 	}
 	respond(w, 200, cronToJSON(job, h.scheduler))
 }
@@ -1286,6 +1351,11 @@ func (h *Handlers) TriggerCron(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "not found"})
 		return
 	}
+	if job.AgentProfileName != "" {
+		if !checkProfilePerm(w, r, job.AgentProfileName, database.PermTriggerCrons) {
+			return
+		}
+	}
 
 	h.scheduler.TriggerJob(job)
 	respond(w, 200, J{"status": "triggered", "id": id})
@@ -1296,6 +1366,17 @@ func (h *Handlers) ListCronExecutions(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 400, J{"error": "invalid id"})
 		return
+	}
+
+	job, err := database.GetCronJob(uint(id))
+	if err != nil {
+		respond(w, 404, J{"error": "not found"})
+		return
+	}
+	if job.AgentProfileName != "" {
+		if !checkProfilePerm(w, r, job.AgentProfileName, database.PermViewCrons) {
+			return
+		}
 	}
 
 	execs, err := database.ListCronExecutions(uint(id), 50)
@@ -1598,6 +1679,22 @@ func (h *Handlers) ListAgentTemplates(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respond(w, 500, J{"error": "failed to list"})
 		return
+	}
+
+	u := userFromCtx(r)
+	visibleProfiles, isAdmin := database.VisibleProfiles(u.ID)
+	if !isAdmin {
+		profileSet := make(map[string]bool, len(visibleProfiles))
+		for _, p := range visibleProfiles {
+			profileSet[p] = true
+		}
+		filtered := profiles[:0]
+		for _, p := range profiles {
+			if profileSet[p.Name] {
+				filtered = append(filtered, p)
+			}
+		}
+		profiles = filtered
 	}
 
 	out := make([]J, 0, len(profiles))
@@ -1981,9 +2078,10 @@ func agentProfileName(a *database.Agent) string {
 
 func agentToJSON(a *database.Agent) J {
 	j := J{
-		"id":     a.ID,
-		"name":   agentProfileName(a),
-		"status": a.Status,
+		"id":           a.ID,
+		"name":         agentProfileName(a),
+		"registration": database.GetAgentRegistrationName(a),
+		"status":       a.Status,
 		"stats": J{
 			"allowed": a.StatsAllowed, "blocked": a.StatsBlocked,
 			"avgMs": a.StatsAvgMs, "minMs": a.StatsMinMs, "maxMs": a.StatsMaxMs,

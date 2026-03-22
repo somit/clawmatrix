@@ -3,7 +3,7 @@ package config
 import "os"
 
 type Config struct {
-	AdminToken      string
+	JWTSecret       string
 	DB              string
 	DBURI           string
 	Listen          string
@@ -27,7 +27,7 @@ func Load() *Config {
 	}
 
 	return &Config{
-		AdminToken:      os.Getenv("ADMIN_TOKEN"),
+		JWTSecret:       os.Getenv("JWT_SECRET"),
 		DB:              db,
 		DBURI:           dbURI,
 		Listen:          envOr("LISTEN", ":8080"),

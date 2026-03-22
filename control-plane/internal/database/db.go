@@ -37,9 +37,15 @@ func Init(driver, uri string) error {
 		DB.Exec("PRAGMA journal_mode=WAL")
 	}
 
-	if err := DB.AutoMigrate(&Registration{}, &Connection{}, &AgentProfile{}, &Agent{}, &RequestLog{}, &Metric{}, &AuditEvent{}, &CronJob{}, &CronExecution{}, &AcmeCache{}); err != nil {
+	if err := DB.AutoMigrate(
+		&Registration{}, &Connection{}, &AgentProfile{}, &Agent{},
+		&RequestLog{}, &Metric{}, &AuditEvent{}, &CronJob{}, &CronExecution{}, &AcmeCache{},
+		&User{}, &Role{}, &RolePermission{}, &AgentProfileACL{}, &UserIdentity{},
+	); err != nil {
 		return err
 	}
+
+	SeedRoles()
 
 	log.Printf("database ready: %s (%s)", uri, driver)
 	return nil

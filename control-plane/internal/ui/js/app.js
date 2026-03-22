@@ -1,5 +1,6 @@
 // --- Global State ---
-let token = localStorage.getItem('cp_admin_token') || '';
+let token = localStorage.getItem('cp_token') || '';
+let currentUser = null;
 let refreshTimer = null;
 let registrationsData = [];
 let eventSource = null;
@@ -8,33 +9,37 @@ let dashboardEvents = []; // collected from SSE for the event feed
 // --- Auth ---
 
 async function doLogin() {
-  const input = document.getElementById('login-token');
+  const username = document.getElementById('login-username').value.trim();
+  const password = document.getElementById('login-password').value;
   const err = document.getElementById('login-error');
   const btn = document.getElementById('login-btn');
-  const val = input.value.trim();
-  if (!val) { err.textContent = 'Token is required'; return; }
+  if (!username || !password) { err.textContent = 'Username and password required'; return; }
 
   btn.disabled = true;
-  btn.textContent = 'Verifying...';
+  btn.textContent = 'Signing in...';
   err.textContent = '';
 
   try {
-    const resp = await fetch('/agent-registrations', {
-      headers: { 'Authorization': 'Bearer ' + val }
+    const resp = await fetch('/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
     });
+    const data = await resp.json();
     if (resp.status === 401) {
-      err.textContent = 'Invalid token';
+      err.textContent = 'Invalid credentials';
       btn.disabled = false;
       btn.textContent = 'Sign in';
       return;
     }
-    if (!resp.ok) throw new Error('Server error');
+    if (!resp.ok) throw new Error(data.error || 'Server error');
 
-    token = val;
-    localStorage.setItem('cp_admin_token', val);
+    token = data.token;
+    currentUser = { username: data.username, system_role: data.system_role };
+    localStorage.setItem('cp_token', token);
     enterApp();
   } catch(e) {
-    err.textContent = 'Cannot reach server';
+    err.textContent = e.message === 'Invalid credentials' ? e.message : 'Cannot reach server';
     btn.disabled = false;
     btn.textContent = 'Sign in';
   }
@@ -42,7 +47,8 @@ async function doLogin() {
 
 function doLogout() {
   token = '';
-  localStorage.removeItem('cp_admin_token');
+  currentUser = null;
+  localStorage.removeItem('cp_token');
   if (refreshTimer) clearInterval(refreshTimer);
   if (eventSource) { eventSource.close(); eventSource = null; }
   closeChat();
@@ -50,13 +56,21 @@ function doLogout() {
   if (typeof closeSessions === 'function') closeSessions();
   document.getElementById('app').classList.remove('visible');
   document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('login-token').value = '';
+  document.getElementById('login-username').value = '';
+  document.getElementById('login-password').value = '';
   document.getElementById('login-error').textContent = '';
+  const loginBtn = document.getElementById('login-btn');
+  if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Sign in'; }
 }
 
-function enterApp() {
+async function enterApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').classList.add('visible');
+  // Always fetch /auth/me to get full user info
+  try {
+    currentUser = await api('GET', '/auth/me');
+  } catch(e) { doLogout(); return; }
+  renderUserInfo();
   initTZSelect();
   loadHealth();
   initTabFromHash();
@@ -64,10 +78,17 @@ function enterApp() {
   connectSSE();
 }
 
+function renderUserInfo() {
+  const el = document.getElementById('current-user');
+  if (!el || !currentUser) return;
+  el.textContent = currentUser.username + (currentUser.system_role ? ' (' + currentUser.system_role + ')' : '');
+}
+
 // Auto-login if token exists
 if (token) {
-  fetch('/agent-registrations', { headers: { 'Authorization': 'Bearer ' + token } })
-    .then(r => { if (r.ok) enterApp(); else doLogout(); })
+  fetch('/auth/me', { headers: { 'Authorization': 'Bearer ' + token } })
+    .then(r => { if (r.ok) return r.json(); throw new Error(); })
+    .then(me => { currentUser = me; enterApp(); })
     .catch(() => doLogout());
 } else {
   document.getElementById('login-screen').style.display = 'flex';
@@ -209,6 +230,7 @@ async function api(method, path, body) {
   if (body) opts.body = JSON.stringify(body);
   const resp = await fetch(path, opts);
   if (resp.status === 401) { doLogout(); throw new Error('unauthorized'); }
+  if (resp.status === 403) { throw new Error('forbidden'); }
   if (resp.status === 304) return null;
   const data = await resp.json();
   if (!resp.ok) throw new Error(data.error || resp.statusText);
@@ -234,6 +256,8 @@ function showTab(name, btn) {
   if (name === 'logs') loadLogs();
   if (name === 'crons') loadCrons();
   if (name === 'events') loadEventsTab();
+  if (name === 'humans') loadHumans();
+  if (name === 'roles') loadRoles();
 }
 
 function initTabFromHash() {
@@ -261,7 +285,7 @@ function initTabFromHash() {
     if (agentId) sessRestoreFromHash(agentId, fileName);
     return;
   }
-  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events'].includes(hash)) {
+  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'humans', 'roles'].includes(hash)) {
     showTab(hash);
   }
 }
@@ -398,4 +422,6 @@ function refresh() {
   if (active && active.id === 'logs-tab') loadLogs();
   if (active && active.id === 'crons-tab') loadCrons();
   if (active && active.id === 'events-tab') loadEventsTab();
+  if (active && active.id === 'humans-tab') loadHumans();
+  if (active && active.id === 'roles-tab') loadRoles();
 }

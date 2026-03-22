@@ -20,7 +20,9 @@ docs/            Additional documentation
 ```bash
 # Control plane (SQLite, plain HTTP)
 cd control-plane
-ADMIN_TOKEN=dev go run .
+JWT_SECRET=dev go run .
+# First time: create an admin user
+# JWT_SECRET=dev go run . createadmin --username admin --password admin
 
 # Clutch (connects to local control plane)
 cd clutch

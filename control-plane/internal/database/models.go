@@ -2,6 +2,48 @@ package database
 
 import "time"
 
+// --- User management ---
+
+type User struct {
+	ID           uint    `gorm:"primaryKey"`
+	Username     string  `gorm:"uniqueIndex;not null"`
+	PasswordHash string  `gorm:"not null"`
+	SystemRoleID *uint   `gorm:"index"`
+	SystemRole   *Role   `gorm:"foreignKey:SystemRoleID"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type Role struct {
+	ID            uint             `gorm:"primaryKey"`
+	Name          string           `gorm:"uniqueIndex;not null"`
+	Description   string           `gorm:"type:text;not null;default:''"`
+	Scope         string           `gorm:"not null"` // "system" | "profile"
+	SystemDefault bool             `gorm:"not null;default:false"`
+	Permissions   []RolePermission `gorm:"foreignKey:RoleID"`
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
+type RolePermission struct {
+	RoleID     uint   `gorm:"primaryKey"`
+	Permission string `gorm:"primaryKey"`
+}
+
+type AgentProfileACL struct {
+	ProfileName string `gorm:"primaryKey"`
+	UserID      uint   `gorm:"primaryKey"`
+	RoleID      uint   `gorm:"not null;index"`
+	Role        Role   `gorm:"foreignKey:RoleID"`
+}
+
+type UserIdentity struct {
+	ID         uint   `gorm:"primaryKey"`
+	UserID     uint   `gorm:"uniqueIndex:idx_user_identity;not null"`
+	Provider   string `gorm:"uniqueIndex:idx_user_identity;not null"` // "slack", "github", "oidc"
+	ExternalID string `gorm:"uniqueIndex:idx_user_identity;not null"`
+}
+
 type AcmeCache struct {
 	Key       string    `gorm:"primaryKey"`
 	Data      []byte    `gorm:"not null"`

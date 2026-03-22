@@ -160,3 +160,25 @@ templ EventsTab() {
 		<div id="events-list"></div>
 	</section>
 }
+
+// HumansTab renders the user (human) management section.
+templ HumansTab() {
+	<section id="humans-tab">
+		<div class="tab-header">
+			<h2>Humans</h2>
+			<button class="btn btn-primary" onclick="openCreateUserModal()">+ New Human</button>
+		</div>
+		<div id="users-list"></div>
+	</section>
+}
+
+// RolesTab renders the role management section.
+templ RolesTab() {
+	<section id="roles-tab">
+		<div class="tab-header">
+			<h2>Roles</h2>
+			<button class="btn btn-primary" onclick="openCreateRoleModal()">+ New Role</button>
+		</div>
+		<div id="roles-list"></div>
+	</section>
+}

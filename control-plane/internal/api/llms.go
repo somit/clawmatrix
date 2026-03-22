@@ -15,19 +15,128 @@ const llmsTxtTemplate = `# ClawMatrix — API Reference
 
 ## Authentication
 
-All endpoints except GET /health and GET /llms.txt require an admin token.
+ClawMatrix uses JWT-based authentication. Obtain a token by logging in:
 
-Send it as a Bearer token:
-  Authorization: Bearer <ADMIN_TOKEN>
+#### POST /auth/login
+Request body:
+  {"username": "string", "password": "string"}
 
-**IMPORTANT:** You do not have the admin token yet. Before making any API call, ask the user:
-"What is your admin token for the control plane?"
+Response 200:
+  {"token": "eyJ...", "username": "string", "system_role": "string|null"}
 
-Once they provide it, use it for all subsequent requests.
+Use the returned token as a Bearer token on all subsequent requests:
+  Authorization: Bearer <TOKEN>
+
+**IMPORTANT:** You do not have a token yet. Before making any API call, ask the user:
+"What is your username and password for the control plane?"
+
+Then POST /auth/login to obtain a token, and use it for all subsequent requests.
+
+#### GET /auth/me
+Returns the currently authenticated user's info.
+
+Response 200:
+  {"id": 1, "username": "string", "system_role": "string|null"}
 
 ---
 
 ## Endpoints
+
+### Users & Roles
+
+Users are humans who log into the control plane. Roles define what they can do.
+System roles grant global permissions; profile roles grant per-agent-profile access via ACL.
+
+#### GET /users
+List all users. Requires can_manage_users permission.
+
+Response 200:
+  [{"id": 1, "username": "string", "system_role": "string|null"}]
+
+#### POST /users
+Create a user. Requires can_manage_users permission.
+
+Request body:
+  {"username": "string", "password": "string", "system_role_id": 1}
+
+Response 201: {"id": 1, "username": "string"}
+
+#### PUT /users/{id}
+Update a user's password or system role. Requires can_manage_users permission.
+
+Request body (all optional):
+  {"password": "string", "system_role_id": 1}
+
+Response 200: {"status": "updated"}
+
+#### DELETE /users/{id}
+Delete a user. Requires can_manage_users permission.
+
+Response 200: {"status": "deleted"}
+
+#### GET /roles
+List all roles (system and profile scoped).
+
+Response 200:
+  [{"ID": 1, "Name": "string", "Scope": "system|profile", "SystemDefault": false, "Permissions": [{"Permission": "string"}]}]
+
+#### POST /roles
+Create a role. Requires can_manage_roles permission.
+
+Request body:
+  {"name": "string", "description": "string", "scope": "system|profile"}
+
+Response 201: Role object.
+
+#### GET /roles/{id}
+Get a single role with its permissions.
+
+#### PUT /roles/{id}
+Update a role's name/description. Requires can_manage_roles permission.
+
+Request body:
+  {"name": "string", "description": "string"}
+
+Response 200: {"status": "updated"}
+
+#### DELETE /roles/{id}
+Delete a non-system-default role. Requires can_manage_roles permission.
+
+Response 200: {"status": "deleted"}
+
+#### POST /roles/{id}/permissions
+Add a permission to a role. Requires can_manage_roles permission.
+
+Request body:
+  {"permission": "string"}
+
+Response 200: {"status": "ok"}
+
+#### DELETE /roles/{id}/permissions/{perm}
+Remove a permission from a role. Requires can_manage_roles permission.
+
+Response 200: {"status": "ok"}
+
+#### GET /agent-profiles/{name}/acl
+List ACL entries for a profile. Requires can_manage_profiles permission.
+
+Response 200:
+  [{"UserID": 1, "RoleID": 1, "ProfileName": "string", "Role": {"Name": "string"}}]
+
+#### POST /agent-profiles/{name}/acl
+Grant a user a role on a profile. Requires can_manage_profiles permission.
+
+Request body:
+  {"user_id": 1, "role_id": 1}
+
+Response 200: {"status": "ok"}
+
+#### DELETE /agent-profiles/{name}/acl/{user_id}
+Remove a user's access from a profile. Requires can_manage_profiles permission.
+
+Response 200: {"status": "ok"}
+
+---
 
 ### Registrations
 
@@ -55,7 +164,7 @@ The returned token is used by agents (sidecars) to register against this registr
 
 Example:
   curl -X POST %s/agent-registrations \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"name":"my-agent","description":"My agent registration","maxRunners":1}'
 
@@ -80,7 +189,7 @@ Response 200:
 
 Example:
   curl %s/agent-registrations \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### PUT /agent-registrations/{name}
 Update a registration. All fields are optional — only provided fields are updated.
@@ -99,7 +208,7 @@ Response 200: {"status": "updated"}
 
 Example:
   curl -X PUT %s/agent-registrations/my-agent \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"description":"Updated description","maxRunners":2}'
 
@@ -113,7 +222,7 @@ Response 200: {"status": "ok", "archived": true}
 
 Example:
   curl -X PUT %s/agent-registrations/my-agent/archive \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"archived":true}'
 
@@ -125,7 +234,7 @@ Response 409: {"error": "cannot delete — agents have registered with this regi
 
 Example:
   curl -X DELETE %s/agent-registrations/my-agent \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 ---
 
@@ -148,7 +257,7 @@ Response 201:
 
 Example:
   curl -X POST %s/connections \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"source":"ceo","target":"cto"}'
 
@@ -164,7 +273,7 @@ Response 200:
 
 Example:
   curl "%s/connections?source=ceo" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### DELETE /connections
 Delete a connection.
@@ -176,7 +285,7 @@ Response 200: {"status": "deleted"}
 
 Example:
   curl -X DELETE %s/connections \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"source":"ceo","target":"cto"}'
 
@@ -213,7 +322,7 @@ Response 200:
 
 Example:
   curl "%s/agents?type=my-agent" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /agents/{id}
 Get a single agent's details.
@@ -222,7 +331,7 @@ Response 200: Same shape as one element of the list above.
 
 Example:
   curl %s/agents/my-agent-abc123 \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### POST /agents/{id}/chat
 Send a chat message to an agent. The agent must have a chatUrl in its meta.
@@ -237,7 +346,7 @@ Response: Streams the agent's reply (may be SSE or JSON depending on agent).
 
 Example:
   curl -X POST %s/agents/my-agent-abc123/chat \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"message":"Hello, what can you do?"}'
 
@@ -251,7 +360,7 @@ Response: File listing or file content from the agent's workspace.
 
 Example:
   curl "%s/agents/my-agent-abc123/workspace?path=/" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /agents/{id}/workspace/locks
 List locked workspace files. Returns a JSON array of locked file paths.
@@ -260,7 +369,7 @@ Response 200: ["SOUL.md", "TOOLS.md"]
 
 Example:
   curl %s/agents/my-agent-abc123/workspace/locks \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### PUT /agents/{id}/workspace/locks
 Lock or unlock a workspace file. Locking sets chmod 444 (read-only), unlocking restores
@@ -274,13 +383,13 @@ Response 200: Updated lock list, e.g. ["SOUL.md", "TOOLS.md"]
 
 Example — lock a file:
   curl -X PUT %s/agents/my-agent-abc123/workspace/locks \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"path":"SOUL.md","locked":true}'
 
 Example — unlock a file:
   curl -X PUT %s/agents/my-agent-abc123/workspace/locks \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"path":"SOUL.md","locked":false}'
 
@@ -294,7 +403,7 @@ Response: List of sessions or session content.
 
 Example:
   curl "%s/agents/my-agent-abc123/sessions" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 ---
 
@@ -342,7 +451,7 @@ Response 201:
 
 Example:
   curl -X POST %s/crons \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"name":"daily-report","registrationName":"my-agent","schedule":"0 9 * * *","timezone":"Asia/Kolkata","message":"Generate the daily report"}'
 
@@ -356,7 +465,7 @@ Response 200: Array of cron objects (same shape as POST response).
 
 Example:
   curl "%s/crons?type=my-agent" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /crons/{id}
 Get a single cron job's details.
@@ -365,7 +474,7 @@ Response 200: Cron object.
 
 Example:
   curl %s/crons/1 \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### PUT /crons/{id}
 Update a cron job. All fields are optional — only provided fields are updated.
@@ -387,7 +496,7 @@ Response 200: Updated cron object.
 
 Example:
   curl -X PUT %s/crons/1 \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"schedule":"0 10 * * *","message":"Updated message"}'
 
@@ -398,7 +507,7 @@ Response 200: {"status": "deleted"}
 
 Example:
   curl -X DELETE %s/crons/1 \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### POST /crons/{id}/trigger
 Trigger a cron job immediately (runs it now regardless of schedule).
@@ -407,7 +516,7 @@ Response 200: {"status": "triggered", "id": 1}
 
 Example:
   curl -X POST %s/crons/1/trigger \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /crons/{id}/executions
 List recent executions of a cron job (up to 50).
@@ -427,7 +536,7 @@ Response 200:
 
 Example:
   curl %s/crons/1/executions \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 ---
 
@@ -455,7 +564,7 @@ Response 200:
 
 Example:
   curl "%s/metrics?type=my-agent&since=1h" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /metrics/series
 Get time-bucketed metric series for charting.
@@ -478,7 +587,7 @@ Response 200:
 
 Example:
   curl "%s/metrics/series?type=my-agent&bucket=5m&since=1h" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /logs
 Query request logs from agents.
@@ -507,7 +616,7 @@ Response 200:
 
 Example:
   curl "%s/logs?action=blocked&since=30m" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 #### GET /audit
 Query audit events (admin actions, registrations, etc.).
@@ -526,7 +635,7 @@ Response 200:
 
 Example:
   curl "%s/audit?since=24h" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 ---
 
@@ -549,7 +658,7 @@ agent:recovered, cron:created, cron:updated, cron:deleted, log:batch.
 
 Example:
   curl -N %s/events \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 
 ---
 
@@ -600,13 +709,13 @@ The agent retains the conversation context within the session.
 
 Example — tell the agent to update its SOUL.md:
   curl -X POST %s/agents/my-agent-abc123/chat \
-    -H "Authorization: Bearer <ADMIN_TOKEN>" \
+    -H "Authorization: Bearer <TOKEN>" \
     -H "Content-Type: application/json" \
     -d '{"message":"Add a section about code review to SOUL.md","session":"autobot-manager-workspace-editor-chat"}'
 
 Example — verify the workspace after edits:
   curl "%s/agents/my-agent-abc123/workspace?path=SOUL.md" \
-    -H "Authorization: Bearer <ADMIN_TOKEN>"
+    -H "Authorization: Bearer <TOKEN>"
 `
 
 func (h *Handlers) LLMsTxt(w http.ResponseWriter, r *http.Request) {

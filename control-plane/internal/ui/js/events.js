@@ -71,7 +71,7 @@ async function loadEventsTab() {
 
     document.getElementById('events-list').innerHTML = html;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('events-list').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }
