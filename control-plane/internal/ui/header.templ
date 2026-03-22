@@ -3,7 +3,7 @@ package ui
 // Header renders the top bar with logo, health indicator, and controls.
 templ Header() {
 	<header>
-		<div class="container">
+		<div class="header-inner">
 			<div class="left">
 				<h1>
 					@templ.Raw(svgHeaderLogo)
@@ -20,21 +20,20 @@ templ Header() {
 	</header>
 }
 
-// Nav renders the primary tab navigation bar.
+// Nav renders the primary sidebar navigation.
 templ Nav() {
-	<nav>
-		<div class="container">
-			<button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
-			<button onclick="showTab('agents', this)">Agents</button>
-			<button onclick="showTab('registrations', this)">Registrations</button>
-			<button onclick="showTab('templates', this)">Profiles</button>
-			<button onclick="showTab('connections', this)">Connections</button>
-			<button onclick="showTab('logs', this)">Network Logs</button>
-			<button onclick="showTab('crons', this)">Crons</button>
-			<button onclick="showTab('events', this)">Events</button>
-			<button onclick="showTab('humans', this)">Humans</button>
+	<nav class="sidebar">
+		<button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
+		<button onclick="showTab('agents', this)">Agents</button>
+		<button onclick="showTab('registrations', this)">Registrations</button>
+		<button onclick="showTab('templates', this)">Profiles</button>
+		<button onclick="showTab('connections', this)">Connections</button>
+		<button onclick="showTab('logs', this)">Network Logs</button>
+		<button onclick="showTab('crons', this)">Crons</button>
+		<button onclick="showTab('events', this)">Events</button>
+		<div class="sidebar-divider"></div>
+		<button onclick="showTab('humans', this)">Humans</button>
 		<button onclick="showTab('roles', this)">Roles</button>
-		</div>
 	</nav>
 }
 
