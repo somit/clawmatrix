@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateUser(username, password string, systemRoleID *uint) (*User, error) {
+func CreateUser(username, password string, systemRoleID *uint, email *string) (*User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -15,12 +15,24 @@ func CreateUser(username, password string, systemRoleID *uint) (*User, error) {
 	u := &User{
 		Username:     username,
 		PasswordHash: string(hash),
+		Email:        email,
 		SystemRoleID: systemRoleID,
 	}
 	if err := DB.Create(u).Error; err != nil {
 		return nil, err
 	}
 	return u, nil
+}
+
+func GetUserByEmail(email string) (*User, error) {
+	var u User
+	if err := DB.Preload("SystemRole.Permissions").Where("email = ?", email).First(&u).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &u, nil
 }
 
 func GetUserByUsername(username string) (*User, error) {

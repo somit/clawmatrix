@@ -112,7 +112,7 @@ func runCreateAdmin(cfg *config.Config) {
 		log.Fatalf("admin role not found (database not initialized?): %v", err)
 	}
 
-	u, err := database.CreateUser(*username, *password, &adminRoleID)
+	u, err := database.CreateUser(*username, *password, &adminRoleID, nil)
 	if err != nil {
 		log.Fatalf("create user: %v", err)
 	}
