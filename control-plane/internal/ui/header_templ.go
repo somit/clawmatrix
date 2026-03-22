@@ -38,7 +38,7 @@ func Header() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "CLAWMATRIX</h1><div class=\"health\" id=\"health\"></div></div><div class=\"header-right\"><select id=\"tz-select\" class=\"tz-select\" onchange=\"onTZChange(this.value)\" title=\"Display timezone\"></select> <button class=\"logout-btn\" onclick=\"doLogout()\">Logout</button></div></div></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "CLAWMATRIX</h1><div class=\"health\" id=\"health\"></div></div><div class=\"header-right\"><select id=\"tz-select\" class=\"tz-select\" onchange=\"onTZChange(this.value)\" title=\"Display timezone\"></select> <span class=\"current-user\" id=\"current-user\"></span> <button class=\"logout-btn\" onclick=\"doLogout()\">Logout</button></div></div></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -68,7 +68,7 @@ func Nav() templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav><div class=\"container\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('events', this)\">Events</button></div></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav><div class=\"container\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('events', this)\">Events</button> <button onclick=\"showTab('humans', this)\">Humans</button> <button onclick=\"showTab('roles', this)\">Roles</button></div></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -131,6 +131,14 @@ func Main() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = EventsTab().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = HumansTab().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = RolesTab().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

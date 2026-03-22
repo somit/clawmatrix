@@ -5,7 +5,9 @@ go 1.23.0
 toolchain go1.24.5
 
 require (
+	github.com/a-h/templ v0.3.1001
 	github.com/glebarez/sqlite v1.11.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/crypto v0.40.0
@@ -14,7 +16,6 @@ require (
 )
 
 require (
-	github.com/a-h/templ v0.3.1001 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
 	github.com/google/uuid v1.3.0 // indirect

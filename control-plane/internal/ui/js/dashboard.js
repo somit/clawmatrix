@@ -17,11 +17,14 @@ async function loadDashboard() {
 
 async function loadDashboardKPIs() {
   try {
-    const [health, agents, registrations] = await Promise.all([
+    const [healthResult, agentsResult, registrationsResult] = await Promise.allSettled([
       fetch('/health').then(r => r.json()),
       api('GET', '/agents'),
       api('GET', '/agent-registrations'),
     ]);
+    const health = healthResult.status === 'fulfilled' ? healthResult.value : {};
+    const agents = agentsResult.status === 'fulfilled' ? agentsResult.value : [];
+    const registrations = registrationsResult.status === 'fulfilled' ? registrationsResult.value : null;
 
     if (registrations && registrations.length) {
       registrationsData = registrations;
@@ -63,7 +66,7 @@ async function loadDashboardKPIs() {
       </div>
     `;
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('dashboard-kpis').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }
@@ -112,7 +115,7 @@ async function loadDashboardCharts() {
 
     renderLineChart('chart-latency', data, { key: 'avgMs', color: '#457b9d' });
   } catch(e) {
-    if (e.message !== 'unauthorized')
+    if (e.message !== 'unauthorized' && e.message !== 'forbidden')
       document.getElementById('dashboard-charts').innerHTML = `<div class="empty error-msg">${esc(e.message)}</div>`;
   }
 }

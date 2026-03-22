@@ -38,7 +38,7 @@ func Login() templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><h1>CLAWMATRIX</h1><p>Enter admin token to access the control plane</p><input type=\"password\" id=\"login-token\" placeholder=\"Admin token\" autofocus onkeydown=\"if(event.key==='Enter')doLogin()\"> <button class=\"login-btn\" onclick=\"doLogin()\" id=\"login-btn\">Sign in</button><div class=\"login-error\" id=\"login-error\"></div></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</div><h1>CLAWMATRIX</h1><p>Sign in to access the control plane</p><input type=\"text\" id=\"login-username\" placeholder=\"Username\" autofocus onkeydown=\"if(event.key==='Enter')document.getElementById('login-password').focus()\"> <input type=\"password\" id=\"login-password\" placeholder=\"Password\" onkeydown=\"if(event.key==='Enter')doLogin()\"> <button class=\"login-btn\" onclick=\"doLogin()\" id=\"login-btn\">Sign in</button><div class=\"login-error\" id=\"login-error\"></div></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

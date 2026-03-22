@@ -17,6 +17,7 @@ async function loadTemplates() {
         <div class="card-header">
           <h3>${esc(t.name)}</h3>
           <div class="card-actions">
+            <button class="btn btn-sm" onclick="showProfileACLModal('${esc(t.name)}')">Access</button>
             <button class="btn btn-sm" onclick="showEditAgentTemplateModal('${esc(t.name)}')">Edit</button>
             ${t.agents > 0
               ? ''
@@ -204,5 +205,74 @@ async function deleteAgentTemplate(name) {
     loadTemplates();
   } catch(e) {
     document.getElementById('dat-result').innerHTML = `<div class="error-msg">${esc(e.message)}</div>`;
+  }
+}
+
+// --- Profile ACL Modal ---
+
+async function showProfileACLModal(profileName) {
+  const [acl, users, roles] = await Promise.all([
+    api('GET', `/agent-profiles/${encodeURIComponent(profileName)}/acl`).catch(() => []),
+    api('GET', '/users').catch(() => []),
+    api('GET', '/roles').catch(() => []),
+  ]);
+  const profileRoles = (roles || []).filter(r => r.Scope === 'profile');
+  renderProfileACLModal(profileName, acl || [], users || [], profileRoles);
+}
+
+function renderProfileACLModal(profileName, acl, users, roles) {
+  const userMap = Object.fromEntries((users || []).map(u => [u.id, u.username]));
+  const aclRows = acl.length
+    ? acl.map(entry => `
+        <div class="acl-row">
+          <span>${esc(userMap[entry.UserID] || 'user #' + entry.UserID)}</span>
+          <span class="pill">${esc(entry.Role?.Name || 'role #' + entry.RoleID)}</span>
+          <button class="btn btn-sm btn-danger" onclick="removeProfileACL('${esc(profileName)}', ${entry.UserID}, this)">Remove</button>
+        </div>`)
+      .join('')
+    : '<p class="muted" style="font-size:13px">No access entries yet.</p>';
+
+  const userOptions = users.map(u => `<option value="${u.id}">${esc(u.username)}</option>`).join('');
+  const roleOptions = roles.map(r => `<option value="${r.ID}">${esc(r.Name)}</option>`).join('');
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal" onclick="event.stopPropagation()">
+        <h3>Access — ${esc(profileName)}</h3>
+        <div class="acl-list" id="acl-list">${aclRows}</div>
+        <div class="acl-add-row">
+          <select id="acl-user">${userOptions}</select>
+          <select id="acl-role">${roleOptions}</select>
+          <button class="btn btn-primary" onclick="addProfileACL('${esc(profileName)}')">Add</button>
+        </div>
+        <div class="modal-error" id="m-error"></div>
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">Done</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function addProfileACL(profileName) {
+  const userId = parseInt(document.getElementById('acl-user').value);
+  const roleId = parseInt(document.getElementById('acl-role').value);
+  const err = document.getElementById('m-error');
+  try {
+    await api('POST', `/agent-profiles/${encodeURIComponent(profileName)}/acl`, { user_id: userId, role_id: roleId });
+    await showProfileACLModal(profileName);
+  } catch(e) {
+    err.textContent = e.message;
+  }
+}
+
+async function removeProfileACL(profileName, userId, btn) {
+  btn.disabled = true;
+  const err = document.getElementById('m-error');
+  try {
+    await api('DELETE', `/agent-profiles/${encodeURIComponent(profileName)}/acl/${userId}`);
+    await showProfileACLModal(profileName);
+  } catch(e) {
+    err.textContent = e.message;
+    btn.disabled = false;
   }
 }

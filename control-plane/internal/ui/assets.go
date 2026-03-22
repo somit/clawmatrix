@@ -23,6 +23,7 @@ type Assets struct {
 	ChatJS          string
 	WorkspaceJS     string
 	SessionsJS      string
+	UsersJS         string
 }
 
 func computeAssets(fs embed.FS) Assets {
@@ -53,5 +54,6 @@ func computeAssets(fs embed.FS) Assets {
 		ChatJS:          v("js/chat.js"),
 		WorkspaceJS:     v("js/workspace.js"),
 		SessionsJS:      v("js/sessions.js"),
+		UsersJS:         v("js/users.js"),
 	}
 }

@@ -30,15 +30,14 @@ type CronScheduler interface {
 }
 
 type Handlers struct {
-	adminToken string
-	hub        *Hub
-	scheduler  CronScheduler
+	hub       *Hub
+	scheduler CronScheduler
 }
 
 type J = map[string]any
 
-func NewHandlers(adminToken string, hub *Hub, scheduler CronScheduler) *Handlers {
-	return &Handlers{adminToken: adminToken, hub: hub, scheduler: scheduler}
+func NewHandlers(hub *Hub, scheduler CronScheduler) *Handlers {
+	return &Handlers{hub: hub, scheduler: scheduler}
 }
 
 // --- Admin ---

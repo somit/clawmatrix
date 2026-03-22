@@ -254,22 +254,70 @@ DELETE /agent-profiles/{name}/acl/{user_id}
 
 ## Auth Token
 
-Session tokens stored in `user_sessions` table:
-```
-user_sessions
-  token_hash   string (PK)
-  user_id      uint FK → users.id
-  expires_at   time
-  created_at   time
+JWT signed with a secret (`JWT_SECRET` env var, HS256).
+
+**Claims:**
+```json
+{
+  "sub": "42",
+  "username": "alice",
+  "system_role": "admin",
+  "exp": 1234567890,
+  "iat": 1234567890
+}
 ```
 
-Token is a random 32-byte hex string. Hash (SHA-256) stored in DB, raw token returned to client once at login.
-Existing `ADMIN_TOKEN` env var continues to work as a superuser API key for backward compatibility (scripts, clutch).
+- No DB lookup on every request — permissions resolved from role after JWT verification
+- `POST /auth/logout` is client-side only (discard token); no server-side invalidation
+- Token expiry via `exp` claim (configurable, default 24h)
+- Existing `ADMIN_TOKEN` env var continues to work as a superuser API key for backward compatibility (scripts, clutch)
+
+---
+
+## CLI
+
+The `control-plane` binary includes a `user` subcommand for post-deployment administration.
+It connects directly to the database (no HTTP, no auth required) using the same `DATABASE_PATH` env var.
+
+```bash
+# Create first admin (run after deployment)
+control-plane createadmin --username admin --password <pass>
+
+# List all admins
+control-plane listadmins
+
+# Delete an admin
+control-plane deleteadmin --username alice
+```
+
+`createadmin` always assigns the `admin` system role.
+Non-admin users are managed via the UI/API after login.
+
+---
+
+## External Identity Mapping (Future)
+
+Users can be mapped to external system identities. When a request originates from an external system (Slack, GitHub, etc.), it resolves to a ClawMatrix user and applies their permissions.
+
+```
+user_identities
+  user_id       uint FK → users.id
+  provider      string  -- "slack", "github", "google", "oidc"
+  external_id   string  -- slack user ID, github username, OIDC sub, etc.
+  PK: (provider, external_id)
+```
+
+**Use case:** Slack user `alice` sends a message to an agent. The agent resolves `alice` to her ClawMatrix user, then respects her `agent_profile_acl` when deciding what data to pass to other agents.
+
+This makes permissions apply end-to-end — from the external trigger all the way through internal agent-to-agent data passing. An agent cannot leak data to a user who lacks `can_view_agents` on the source profile, even if the request comes through Slack.
+
+OIDC logins automatically populate `user_identities` on first login.
 
 ---
 
 ## Migration / Bootstrap
 
-- On first startup with no users: create default roles + prompt/env-based admin user creation
-- `ADMIN_TOKEN` still works indefinitely as a bypass for backward compat
-- Existing single-token auth (`withAdmin` middleware) becomes: check `ADMIN_TOKEN` first, then check user session
+- On first startup: seed default roles into DB if not present
+- No users required to start the server — use CLI to create the first admin
+- `ADMIN_TOKEN` still works indefinitely as a bypass for backward compat (scripts, clutch)
+- Existing single-token auth (`withAdmin` middleware) becomes: check `ADMIN_TOKEN` first, then check JWT

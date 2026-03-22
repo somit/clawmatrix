@@ -3,11 +3,12 @@ package api
 import (
 	"net/http"
 
+	"control-plane/internal/database"
 	"control-plane/internal/ui"
 )
 
-func NewRouter(adminToken string, hub *Hub, scheduler CronScheduler) http.Handler {
-	h := NewHandlers(adminToken, hub, scheduler)
+func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
+	h := NewHandlers(hub, scheduler)
 
 	mux := http.NewServeMux()
 
@@ -15,29 +16,55 @@ func NewRouter(adminToken string, hub *Hub, scheduler CronScheduler) http.Handle
 	mux.HandleFunc("GET /", ui.Handler())
 	mux.Handle("GET /ui/", ui.StaticHandler())
 
-	// SSE
-	mux.HandleFunc("GET /events", hub.ServeHTTP(adminToken))
+	// SSE — JWT via query param (EventSource can't set headers)
+	mux.HandleFunc("GET /events", hub.ServeHTTP())
 
-	// LLMs
+	// Public
 	mux.HandleFunc("GET /llms.txt", h.LLMsTxt)
+	mux.HandleFunc("GET /health", h.Health)
 
-	// Admin
-	mux.HandleFunc("POST /agent-registrations", h.withAdmin(h.CreateRegistration))
-	mux.HandleFunc("GET /agent-registrations", h.withAdmin(h.ListRegistrations))
-	mux.HandleFunc("PUT /agent-registrations/{name}", h.withAdmin(h.UpdateRegistration))
-	mux.HandleFunc("PUT /agent-registrations/{name}/archive", h.withAdmin(h.ArchiveRegistration))
-	mux.HandleFunc("DELETE /agent-registrations/{name}", h.withAdmin(h.DeleteRegistration))
+	// Auth
+	mux.HandleFunc("POST /auth/login", h.Login)
+	mux.HandleFunc("GET /auth/me", h.withAdmin(h.Me))
 
-	// Agent Profiles (admin)
-	mux.HandleFunc("POST /agent-profiles", h.withAdmin(h.CreateAgentTemplate))
+	// Users
+	mux.HandleFunc("GET /users", h.withPerm(database.PermManageUsers, h.ListUsers))
+	mux.HandleFunc("POST /users", h.withPerm(database.PermManageUsers, h.CreateUser))
+	mux.HandleFunc("GET /users/{id}", h.withPerm(database.PermManageUsers, h.GetUser))
+	mux.HandleFunc("PUT /users/{id}", h.withPerm(database.PermManageUsers, h.UpdateUser))
+	mux.HandleFunc("DELETE /users/{id}", h.withPerm(database.PermManageUsers, h.DeleteUser))
+
+	// Roles
+	mux.HandleFunc("GET /roles", h.withAdmin(h.ListRoles))
+	mux.HandleFunc("POST /roles", h.withPerm(database.PermManageRoles, h.CreateRole))
+	mux.HandleFunc("GET /roles/{id}", h.withAdmin(h.GetRole))
+	mux.HandleFunc("PUT /roles/{id}", h.withPerm(database.PermManageRoles, h.UpdateRole))
+	mux.HandleFunc("DELETE /roles/{id}", h.withPerm(database.PermManageRoles, h.DeleteRole))
+	mux.HandleFunc("POST /roles/{id}/permissions", h.withPerm(database.PermManageRoles, h.AddRolePermission))
+	mux.HandleFunc("DELETE /roles/{id}/permissions/{perm}", h.withPerm(database.PermManageRoles, h.RemoveRolePermission))
+
+	// Profile ACL
+	mux.HandleFunc("GET /agent-profiles/{name}/acl", h.withPerm(database.PermManageProfiles, h.ListProfileACL))
+	mux.HandleFunc("POST /agent-profiles/{name}/acl", h.withPerm(database.PermManageProfiles, h.SetProfileACL))
+	mux.HandleFunc("DELETE /agent-profiles/{name}/acl/{user_id}", h.withPerm(database.PermManageProfiles, h.DeleteProfileACL))
+
+	// Registrations
+	mux.HandleFunc("POST /agent-registrations", h.withPerm(database.PermManageRegistrations, h.CreateRegistration))
+	mux.HandleFunc("GET /agent-registrations", h.withPerm(database.PermManageRegistrations, h.ListRegistrations))
+	mux.HandleFunc("PUT /agent-registrations/{name}", h.withPerm(database.PermManageRegistrations, h.UpdateRegistration))
+	mux.HandleFunc("PUT /agent-registrations/{name}/archive", h.withPerm(database.PermManageRegistrations, h.ArchiveRegistration))
+	mux.HandleFunc("DELETE /agent-registrations/{name}", h.withPerm(database.PermManageRegistrations, h.DeleteRegistration))
+
+	// Agent Profiles
+	mux.HandleFunc("POST /agent-profiles", h.withPerm(database.PermManageProfiles, h.CreateAgentTemplate))
 	mux.HandleFunc("GET /agent-profiles", h.withAdmin(h.ListAgentTemplates))
-	mux.HandleFunc("PUT /agent-profiles/{name}", h.withAdmin(h.UpdateAgentTemplate))
-	mux.HandleFunc("DELETE /agent-profiles/{name}", h.withAdmin(h.DeleteAgentTemplate))
+	mux.HandleFunc("PUT /agent-profiles/{name}", h.withPerm(database.PermManageProfiles, h.UpdateAgentTemplate))
+	mux.HandleFunc("DELETE /agent-profiles/{name}", h.withPerm(database.PermManageProfiles, h.DeleteAgentTemplate))
 
-	// Connections (admin)
-	mux.HandleFunc("POST /connections", h.withAdmin(h.CreateConnection))
+	// Connections
+	mux.HandleFunc("POST /connections", h.withPerm(database.PermManageConnections, h.CreateConnection))
 	mux.HandleFunc("GET /connections", h.withAdmin(h.ListConnections))
-	mux.HandleFunc("DELETE /connections", h.withAdmin(h.DeleteConnection))
+	mux.HandleFunc("DELETE /connections", h.withPerm(database.PermManageConnections, h.DeleteConnection))
 
 	// Sidecar
 	mux.HandleFunc("POST /register", h.withAgent(h.Register))
@@ -48,11 +75,11 @@ func NewRouter(adminToken string, hub *Hub, scheduler CronScheduler) http.Handle
 	mux.HandleFunc("GET /config", h.withAgent(h.Config))
 
 	// Crons - Admin
-	mux.HandleFunc("POST /crons", h.withAdmin(h.CreateCron))
+	mux.HandleFunc("POST /crons", h.withPerm(database.PermManageCrons, h.CreateCron))
 	mux.HandleFunc("GET /crons", h.withAdmin(h.ListCrons))
 	mux.HandleFunc("GET /crons/{id}", h.withAdmin(h.GetCron))
-	mux.HandleFunc("PUT /crons/{id}", h.withAdmin(h.UpdateCron))
-	mux.HandleFunc("DELETE /crons/{id}", h.withAdmin(h.DeleteCron))
+	mux.HandleFunc("PUT /crons/{id}", h.withPerm(database.PermManageCrons, h.UpdateCron))
+	mux.HandleFunc("DELETE /crons/{id}", h.withPerm(database.PermManageCrons, h.DeleteCron))
 	mux.HandleFunc("POST /crons/{id}/trigger", h.withAdmin(h.TriggerCron))
 	mux.HandleFunc("GET /crons/{id}/executions", h.withAdmin(h.ListCronExecutions))
 
@@ -66,7 +93,7 @@ func NewRouter(adminToken string, hub *Hub, scheduler CronScheduler) http.Handle
 	mux.HandleFunc("PUT /agent-crons/{id}", h.withAgent(h.AgentUpdateCron))
 	mux.HandleFunc("DELETE /agent-crons/{id}", h.withAgent(h.AgentDeleteCron))
 
-	// Query
+	// Agents & Query
 	mux.HandleFunc("GET /agents", h.withAdmin(h.ListAgents))
 	mux.HandleFunc("GET /agents/{id}", h.withAdmin(h.GetAgent))
 	mux.HandleFunc("POST /agents/{id}/chat", h.withAdmin(h.ChatProxy))
@@ -74,12 +101,11 @@ func NewRouter(adminToken string, hub *Hub, scheduler CronScheduler) http.Handle
 	mux.HandleFunc("PUT /agents/{id}/workspace/locks", h.withAdmin(h.WorkspaceLocksProxy))
 	mux.HandleFunc("GET /agents/{id}/workspace", h.withAdmin(h.WorkspaceProxy))
 	mux.HandleFunc("GET /agents/{id}/sessions", h.withAdmin(h.SessionsProxy))
-	mux.HandleFunc("GET /metrics", h.withAdmin(h.GetMetrics))
-	mux.HandleFunc("GET /metrics/series", h.withAdmin(h.GetMetricsSeries))
-	mux.HandleFunc("GET /logs", h.withAdmin(h.QueryLogs))
-	mux.HandleFunc("GET /logs/stats", h.withAdmin(h.LogStats))
-	mux.HandleFunc("GET /audit", h.withAdmin(h.QueryAudit))
-	mux.HandleFunc("GET /health", h.Health)
+	mux.HandleFunc("GET /metrics", h.withPerm(database.PermViewMetrics, h.GetMetrics))
+	mux.HandleFunc("GET /metrics/series", h.withPerm(database.PermViewMetrics, h.GetMetricsSeries))
+	mux.HandleFunc("GET /logs", h.withPerm(database.PermViewLogs, h.QueryLogs))
+	mux.HandleFunc("GET /logs/stats", h.withPerm(database.PermViewLogs, h.LogStats))
+	mux.HandleFunc("GET /audit", h.withPerm(database.PermViewAudit, h.QueryAudit))
 
 	return mux
 }
