@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"control-plane/internal/database"
+	"control-plane/internal/metrics"
 )
 
 // CronScheduler is implemented by internal/cron.Scheduler.
@@ -415,10 +416,13 @@ func (h *Handlers) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		MaxMs:    req.Stats.MaxMs,
 		ReqCount: req.Stats.ReqCount,
 	}
+	regName := database.GetAgentRegistrationName(agent)
 	database.UpdateAgentHeartbeat(req.AgentID, s)
-	database.RecordMetric(req.AgentID, database.GetAgentRegistrationName(agent), s)
+	database.RecordMetric(req.AgentID, regName, s)
+	metrics.RecordHeartbeat(req.AgentID, regName, s.Allowed, s.Blocked, s.ReqCount, s.AvgMs, s.MinMs, s.MaxMs)
 
 	if agent.Status == "kill" {
+		metrics.RecordHealth(req.AgentID, regName, "kill")
 		respond(w, 200, J{"status": "kill", "reason": agent.KillReason})
 		return
 	}
@@ -429,6 +433,7 @@ func (h *Handlers) Heartbeat(w http.ResponseWriter, r *http.Request) {
 		h.hub.Broadcast(Event{Type: "agent:recovered", Data: J{"id": req.AgentID}})
 	}
 
+	metrics.RecordHealth(req.AgentID, regName, "healthy")
 	respond(w, 200, J{"status": "ok"})
 }
 
@@ -473,6 +478,15 @@ func (h *Handlers) IngestLogs(w http.ResponseWriter, r *http.Request) {
 		respond(w, 500, J{"error": "failed to store"})
 		return
 	}
+
+	actionCounts := map[string]int64{}
+	for _, l := range logs {
+		actionCounts[l.Action]++
+	}
+	for action, count := range actionCounts {
+		metrics.RecordLogBatch(reg.Name, action, count)
+	}
+
 	h.hub.Broadcast(Event{Type: "log:batch", Data: J{"registration": reg.Name, "count": len(logs)}})
 	respond(w, 200, J{"accepted": len(logs)})
 }

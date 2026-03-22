@@ -8,6 +8,7 @@ import (
 
 	"control-plane/internal/api"
 	"control-plane/internal/database"
+	"control-plane/internal/metrics"
 )
 
 const (
@@ -71,6 +72,7 @@ func checkStale() {
 			age := now.Sub(a.RegisteredAt)
 			if age > time.Duration(reg.TTLMinutes)*time.Minute {
 				database.UpdateAgentStatus(a.ID, "kill", "ttl_exceeded")
+				metrics.RecordHealth(a.ID, regName, "kill")
 				logWorker("TTL_KILL", a.ID, fmt.Sprintf("ran %s", age.Truncate(time.Second)))
 				hub.Broadcast(api.Event{Type: "agent:killed", Data: J{"id": a.ID, "reason": "ttl_exceeded"}})
 				continue
@@ -82,6 +84,7 @@ func checkStale() {
 		threshold := heartbeatInterval * time.Duration(staleAfterMissed)
 		if missed > threshold && a.Status == "healthy" {
 			database.UpdateAgentStatus(a.ID, "stale", "")
+			metrics.RecordHealth(a.ID, regName, "stale")
 			logWorker("STALE", a.ID, fmt.Sprintf("missed %s", missed.Truncate(time.Second)))
 			hub.Broadcast(api.Event{Type: "agent:stale", Data: J{"id": a.ID}})
 		}
