@@ -174,10 +174,10 @@ async function openEditUserModal(id, username, email, currentRole) {
           <div id="m-identities" class="identities-list">
             ${renderIdentitiesList(id, identities)}
           </div>
-          <div class="identities-add" style="display:flex;gap:8px;margin-top:8px">
-            <input id="m-ident-provider" type="text" placeholder="provider (e.g. oidc)" style="flex:1" />
-            <input id="m-ident-extid" type="text" placeholder="external ID" style="flex:2" />
-            <button class="btn btn-sm btn-primary" onclick="addIdentity(${id})">Link</button>
+          <div class="identities-add" style="display:flex;gap:6px;margin-top:8px">
+            <input id="m-ident-provider" type="text" placeholder="provider" style="width:90px;flex:none" />
+            <input id="m-ident-extid" type="text" placeholder="external ID" style="flex:1;min-width:0" />
+            <button class="btn btn-sm" onclick="addIdentity(${id})">+ Link</button>
           </div>
         </div>
         <div class="modal-error" id="m-error"></div>
@@ -192,10 +192,10 @@ async function openEditUserModal(id, username, email, currentRole) {
 function renderIdentitiesList(userId, identities) {
   if (!identities || !identities.length) return '<span class="muted" style="font-size:13px">No linked identities</span>';
   return identities.map(i => `
-    <div class="identity-row" style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
-      <span class="pill">${esc(i.provider)}</span>
-      <span class="muted" style="font-size:12px;flex:1;overflow:hidden;text-overflow:ellipsis">${esc(i.external_id)}</span>
-      <button class="btn btn-sm btn-danger" onclick="removeIdentity(${userId}, '${esc(i.provider)}')">Remove</button>
+    <div class="identity-row" style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span class="pill pill-sm" style="min-width:48px;text-align:center">${esc(i.provider)}</span>
+      <code style="font-size:11px;color:var(--muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(i.external_id)}">${esc(i.external_id)}</code>
+      <button class="btn btn-sm" style="color:var(--red);border-color:var(--red);padding:2px 8px;font-size:12px" onclick="removeIdentity(${userId}, '${esc(i.provider)}')">×</button>
     </div>
   `).join('');
 }

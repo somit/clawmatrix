@@ -77,6 +77,11 @@ async function loadRegistrations() {
     const active = registrationsData.filter(r => !r.archived);
     const archived = registrationsData.filter(r => r.archived);
 
+    const activeBtn = document.getElementById('subtab-regs-active');
+    const archivedBtn = document.getElementById('subtab-regs-archived');
+    if (activeBtn) activeBtn.textContent = `Active${active.length ? ` (${active.length})` : ''}`;
+    if (archivedBtn) archivedBtn.textContent = `Archived${archived.length ? ` (${archived.length})` : ''}`;
+
     document.getElementById('registrations-list').innerHTML = active.length
       ? active.map(renderRegistrationCard).join('')
       : '<div class="empty">No registrations yet. Create one to get started.</div>';
