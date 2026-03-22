@@ -17,8 +17,8 @@ const (
 	ctxClaims       ctxKey = "claims"
 )
 
-// withAdmin requires a valid JWT.
-func (h *Handlers) withAdmin(next http.HandlerFunc) http.HandlerFunc {
+// withAuth requires a valid JWT (any authenticated user).
+func (h *Handlers) withAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		claims, err := auth.Verify(bearer(r))
 		if err != nil {
@@ -36,9 +36,9 @@ func (h *Handlers) withAdmin(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-// withPerm wraps withAdmin and checks for a specific system permission.
+// withPerm wraps withAuth and checks for a specific system permission.
 func (h *Handlers) withPerm(perm string, next http.HandlerFunc) http.HandlerFunc {
-	return h.withAdmin(func(w http.ResponseWriter, r *http.Request) {
+	return h.withAuth(func(w http.ResponseWriter, r *http.Request) {
 		u := userFromCtx(r)
 		if !database.UserHasSystemPerm(u.ID, perm) {
 			respond(w, 403, J{"error": "forbidden"})
@@ -59,6 +59,16 @@ func (h *Handlers) withAgent(next http.HandlerFunc) http.HandlerFunc {
 		ctx := context.WithValue(r.Context(), ctxRegistration, reg)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// checkProfilePerm verifies the user has a profile-scoped permission; returns false and writes 403 if not.
+func checkProfilePerm(w http.ResponseWriter, r *http.Request, profileName, perm string) bool {
+	u := userFromCtx(r)
+	if !database.UserHasProfilePerm(u.ID, profileName, perm) {
+		respond(w, 403, J{"error": "forbidden"})
+		return false
+	}
+	return true
 }
 
 func bearer(r *http.Request) string {

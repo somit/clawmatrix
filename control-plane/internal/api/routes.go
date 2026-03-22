@@ -25,7 +25,7 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 
 	// Auth
 	mux.HandleFunc("POST /auth/login", h.Login)
-	mux.HandleFunc("GET /auth/me", h.withAdmin(h.Me))
+	mux.HandleFunc("GET /auth/me", h.withAuth(h.Me))
 
 	// Users
 	mux.HandleFunc("GET /users", h.withPerm(database.PermManageUsers, h.ListUsers))
@@ -35,9 +35,9 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 	mux.HandleFunc("DELETE /users/{id}", h.withPerm(database.PermManageUsers, h.DeleteUser))
 
 	// Roles
-	mux.HandleFunc("GET /roles", h.withAdmin(h.ListRoles))
+	mux.HandleFunc("GET /roles", h.withAuth(h.ListRoles))
 	mux.HandleFunc("POST /roles", h.withPerm(database.PermManageRoles, h.CreateRole))
-	mux.HandleFunc("GET /roles/{id}", h.withAdmin(h.GetRole))
+	mux.HandleFunc("GET /roles/{id}", h.withAuth(h.GetRole))
 	mux.HandleFunc("PUT /roles/{id}", h.withPerm(database.PermManageRoles, h.UpdateRole))
 	mux.HandleFunc("DELETE /roles/{id}", h.withPerm(database.PermManageRoles, h.DeleteRole))
 	mux.HandleFunc("POST /roles/{id}/permissions", h.withPerm(database.PermManageRoles, h.AddRolePermission))
@@ -57,13 +57,13 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 
 	// Agent Profiles
 	mux.HandleFunc("POST /agent-profiles", h.withPerm(database.PermManageProfiles, h.CreateAgentTemplate))
-	mux.HandleFunc("GET /agent-profiles", h.withAdmin(h.ListAgentTemplates))
+	mux.HandleFunc("GET /agent-profiles", h.withAuth(h.ListAgentTemplates))
 	mux.HandleFunc("PUT /agent-profiles/{name}", h.withPerm(database.PermManageProfiles, h.UpdateAgentTemplate))
 	mux.HandleFunc("DELETE /agent-profiles/{name}", h.withPerm(database.PermManageProfiles, h.DeleteAgentTemplate))
 
 	// Connections
 	mux.HandleFunc("POST /connections", h.withPerm(database.PermManageConnections, h.CreateConnection))
-	mux.HandleFunc("GET /connections", h.withAdmin(h.ListConnections))
+	mux.HandleFunc("GET /connections", h.withPerm(database.PermManageConnections, h.ListConnections))
 	mux.HandleFunc("DELETE /connections", h.withPerm(database.PermManageConnections, h.DeleteConnection))
 
 	// Sidecar
@@ -76,12 +76,12 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 
 	// Crons - Admin
 	mux.HandleFunc("POST /crons", h.withPerm(database.PermManageCrons, h.CreateCron))
-	mux.HandleFunc("GET /crons", h.withAdmin(h.ListCrons))
-	mux.HandleFunc("GET /crons/{id}", h.withAdmin(h.GetCron))
+	mux.HandleFunc("GET /crons", h.withAuth(h.ListCrons))
+	mux.HandleFunc("GET /crons/{id}", h.withAuth(h.GetCron))
 	mux.HandleFunc("PUT /crons/{id}", h.withPerm(database.PermManageCrons, h.UpdateCron))
 	mux.HandleFunc("DELETE /crons/{id}", h.withPerm(database.PermManageCrons, h.DeleteCron))
-	mux.HandleFunc("POST /crons/{id}/trigger", h.withAdmin(h.TriggerCron))
-	mux.HandleFunc("GET /crons/{id}/executions", h.withAdmin(h.ListCronExecutions))
+	mux.HandleFunc("POST /crons/{id}/trigger", h.withAuth(h.TriggerCron))
+	mux.HandleFunc("GET /crons/{id}/executions", h.withAuth(h.ListCronExecutions))
 
 	// Agent-to-Agent
 	mux.HandleFunc("POST /agent-chat/{target}", h.withAgent(h.AgentChat))
@@ -94,13 +94,13 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 	mux.HandleFunc("DELETE /agent-crons/{id}", h.withAgent(h.AgentDeleteCron))
 
 	// Agents & Query
-	mux.HandleFunc("GET /agents", h.withAdmin(h.ListAgents))
-	mux.HandleFunc("GET /agents/{id}", h.withAdmin(h.GetAgent))
-	mux.HandleFunc("POST /agents/{id}/chat", h.withAdmin(h.ChatProxy))
-	mux.HandleFunc("GET /agents/{id}/workspace/locks", h.withAdmin(h.WorkspaceLocksProxy))
-	mux.HandleFunc("PUT /agents/{id}/workspace/locks", h.withAdmin(h.WorkspaceLocksProxy))
-	mux.HandleFunc("GET /agents/{id}/workspace", h.withAdmin(h.WorkspaceProxy))
-	mux.HandleFunc("GET /agents/{id}/sessions", h.withAdmin(h.SessionsProxy))
+	mux.HandleFunc("GET /agents", h.withAuth(h.ListAgents))
+	mux.HandleFunc("GET /agents/{id}", h.withAuth(h.GetAgent))
+	mux.HandleFunc("POST /agents/{id}/chat", h.withAuth(h.ChatProxy))
+	mux.HandleFunc("GET /agents/{id}/workspace/locks", h.withAuth(h.WorkspaceLocksProxy))
+	mux.HandleFunc("PUT /agents/{id}/workspace/locks", h.withAuth(h.WorkspaceLocksProxy))
+	mux.HandleFunc("GET /agents/{id}/workspace", h.withAuth(h.WorkspaceProxy))
+	mux.HandleFunc("GET /agents/{id}/sessions", h.withAuth(h.SessionsProxy))
 	mux.HandleFunc("GET /metrics", h.withPerm(database.PermViewMetrics, h.GetMetrics))
 	mux.HandleFunc("GET /metrics/series", h.withPerm(database.PermViewMetrics, h.GetMetricsSeries))
 	mux.HandleFunc("GET /logs", h.withPerm(database.PermViewLogs, h.QueryLogs))
