@@ -11,6 +11,8 @@ services:
       - DB_URI=/data/control-plane.db
       - LISTEN=:8080
       - BOOTSTRAP_CONFIG=/etc/control-plane/bootstrap.json
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
     volumes:
       - cp-data:/data
     healthcheck:

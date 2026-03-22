@@ -1,0 +1,48 @@
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.109.1
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm-data:/victoria-metrics-data
+    command:
+      - -storageDataPath=/victoria-metrics-data
+      - -retentionPeriod=30d
+      - -promscrape.config=/etc/vm/scrape.yml
+    configs:
+      - source: vm_scrape
+        target: /etc/vm/scrape.yml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    restart: unless-stopped
+    depends_on:
+      - victoriametrics
+
+configs:
+  vm_scrape:
+    content: |
+      global:
+        scrape_interval: 15s
+
+      scrape_configs:
+        - job_name: clawmatrix
+          static_configs:
+            - targets:
+                - host.docker.internal:8080
+          metrics_path: /metrics
+
+volumes:
+  vm-data:
+  grafana-data:

@@ -48,6 +48,19 @@ func (h *Handlers) withPerm(perm string, next http.HandlerFunc) http.HandlerFunc
 	})
 }
 
+// withPermOrEmpty wraps withAuth for list (GET) endpoints: returns an empty JSON array
+// instead of 403 when the user lacks the required system permission.
+func (h *Handlers) withPermOrEmpty(perm string, next http.HandlerFunc) http.HandlerFunc {
+	return h.withAuth(func(w http.ResponseWriter, r *http.Request) {
+		u := userFromCtx(r)
+		if !database.UserHasSystemPerm(u.ID, perm) {
+			respond(w, 200, []any{})
+			return
+		}
+		next(w, r)
+	})
+}
+
 func (h *Handlers) withAgent(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		tok := bearer(r)

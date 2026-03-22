@@ -51,6 +51,14 @@ func main() {
 		log.Fatalf("metrics: %v", err)
 	}
 
+	if err := metrics.RegisterSystemObservers(
+		func() int64 { n, _ := database.UserCount(); return n },
+		func() int64 { regs, _ := database.ListRegistrations(); var n int64; for _, r := range regs { if !r.Archived { n++ } }; return n },
+		func() int64 { regs, _ := database.ListRegistrations(); var n int64; for _, r := range regs { if r.Archived { n++ } }; return n },
+	); err != nil {
+		log.Printf("metrics system observers: %v", err)
+	}
+
 	if cfg.BootstrapConfig != "" {
 		database.Bootstrap(cfg.BootstrapConfig)
 	}

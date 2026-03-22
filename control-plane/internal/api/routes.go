@@ -61,7 +61,7 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 
 	// Registrations
 	mux.HandleFunc("POST /agent-registrations", h.withPerm(database.PermManageRegistrations, h.CreateRegistration))
-	mux.HandleFunc("GET /agent-registrations", h.withPerm(database.PermManageRegistrations, h.ListRegistrations))
+	mux.HandleFunc("GET /agent-registrations", h.withPermOrEmpty(database.PermManageRegistrations, h.ListRegistrations))
 	mux.HandleFunc("PUT /agent-registrations/{name}", h.withPerm(database.PermManageRegistrations, h.UpdateRegistration))
 	mux.HandleFunc("PUT /agent-registrations/{name}/archive", h.withPerm(database.PermManageRegistrations, h.ArchiveRegistration))
 	mux.HandleFunc("DELETE /agent-registrations/{name}", h.withPerm(database.PermManageRegistrations, h.DeleteRegistration))
@@ -121,5 +121,5 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 	// Prometheus scrape endpoint
 	mux.Handle("GET /metrics", metrics.Handler())
 
-	return otelhttp.NewHandler(mux, "control-plane")
+	return metrics.Middleware(otelhttp.NewHandler(mux, "control-plane"))
 }
