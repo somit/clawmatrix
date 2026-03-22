@@ -15,6 +15,7 @@ import (
 	"control-plane/internal/config"
 	cronpkg "control-plane/internal/cron"
 	"control-plane/internal/database"
+	"control-plane/internal/metrics"
 	"control-plane/internal/worker"
 )
 
@@ -45,6 +46,10 @@ func main() {
 	}
 
 	auth.Init(cfg.JWTSecret)
+
+	if err := metrics.Init(); err != nil {
+		log.Fatalf("metrics: %v", err)
+	}
 
 	if cfg.BootstrapConfig != "" {
 		database.Bootstrap(cfg.BootstrapConfig)

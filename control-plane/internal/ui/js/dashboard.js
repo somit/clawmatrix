@@ -76,7 +76,7 @@ async function loadDashboardCharts() {
   const bucketMap = { '1h': '1m', '6h': '5m', '24h': '30m', '168h': '3h' };
   const bucket = bucketMap[dashboardRange] || '5m';
 
-  let path = '/metrics/series?since=' + dashboardRange + '&bucket=' + bucket;
+  let path = '/api/metrics/series?since=' + dashboardRange + '&bucket=' + bucket;
   if (templateName) path += '&type=' + encodeURIComponent(templateName);
 
   try {

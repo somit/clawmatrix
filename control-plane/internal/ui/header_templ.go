@@ -30,7 +30,7 @@ func Header() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header><div class=\"container\"><div class=\"left\"><h1>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<header><div class=\"header-inner\"><div class=\"left\"><h1>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -46,7 +46,7 @@ func Header() templ.Component {
 	})
 }
 
-// Nav renders the primary tab navigation bar.
+// Nav renders the primary sidebar navigation.
 func Nav() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -68,7 +68,7 @@ func Nav() templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav><div class=\"container\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('events', this)\">Events</button> <button onclick=\"showTab('humans', this)\">Humans</button> <button onclick=\"showTab('roles', this)\">Roles</button></div></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav class=\"sidebar\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('events', this)\">Events</button><div class=\"sidebar-divider\"></div><button onclick=\"showTab('humans', this)\">Humans</button> <button onclick=\"showTab('roles', this)\">Roles</button></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

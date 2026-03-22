@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 golang:1.22-alpine AS builder
+FROM --platform=linux/amd64 golang:1.25-alpine AS builder
 RUN apk add --no-cache ca-certificates
 WORKDIR /src
 COPY go.mod main.go ./

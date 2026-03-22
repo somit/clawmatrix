@@ -3,7 +3,10 @@ package api
 import (
 	"net/http"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"control-plane/internal/database"
+	"control-plane/internal/metrics"
 	"control-plane/internal/ui"
 )
 
@@ -106,11 +109,14 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 	mux.HandleFunc("PUT /agents/{id}/workspace/locks", h.withAuth(h.WorkspaceLocksProxy))
 	mux.HandleFunc("GET /agents/{id}/workspace", h.withAuth(h.WorkspaceProxy))
 	mux.HandleFunc("GET /agents/{id}/sessions", h.withAuth(h.SessionsProxy))
-	mux.HandleFunc("GET /metrics", h.withPerm(database.PermViewMetrics, h.GetMetrics))
-	mux.HandleFunc("GET /metrics/series", h.withPerm(database.PermViewMetrics, h.GetMetricsSeries))
+	mux.HandleFunc("GET /api/metrics", h.withPerm(database.PermViewMetrics, h.GetMetrics))
+	mux.HandleFunc("GET /api/metrics/series", h.withPerm(database.PermViewMetrics, h.GetMetricsSeries))
 	mux.HandleFunc("GET /logs", h.withPerm(database.PermViewLogs, h.QueryLogs))
 	mux.HandleFunc("GET /logs/stats", h.withPerm(database.PermViewLogs, h.LogStats))
 	mux.HandleFunc("GET /audit", h.withPerm(database.PermViewAudit, h.QueryAudit))
 
-	return mux
+	// Prometheus scrape endpoint
+	mux.Handle("GET /metrics", metrics.Handler())
+
+	return otelhttp.NewHandler(mux, "control-plane")
 }
