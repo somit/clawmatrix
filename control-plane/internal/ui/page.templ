@@ -1,0 +1,49 @@
+package ui
+
+// Page renders the full HTML document, composing all UI sections.
+templ Page(a Assets) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1"/>
+			<title>ClawMatrix</title>
+			<link rel="icon" type="image/svg+xml" href={ templ.SafeURL(svgFaviconHref) }/>
+			<link rel="stylesheet" href={ templ.SafeURL(a.StyleCSS) }/>
+		</head>
+		<body>
+			@Login()
+			@App(a)
+		</body>
+	</html>
+}
+
+// App renders the authenticated app shell (hidden until login).
+templ App(a Assets) {
+	<div class="app" id="app">
+		@Header()
+		@Nav()
+		@Main()
+	</div>
+	<div id="modal-root"></div>
+	<div id="chat-root"></div>
+	<div id="workspace-root"></div>
+	@Scripts(a)
+}
+
+// Scripts renders all versioned JS tags. Order matters — app.js defines globals used by others.
+templ Scripts(a Assets) {
+	<script src="https://cdn.jsdelivr.net/npm/cronstrue@2.50.0/dist/cronstrue.min.js"></script>
+	<script src={ templ.SafeURL(a.AppJS) }></script>
+	<script src={ templ.SafeURL(a.RegistrationsJS) }></script>
+	<script src={ templ.SafeURL(a.TemplatesJS) }></script>
+	<script src={ templ.SafeURL(a.ConnectionsJS) }></script>
+	<script src={ templ.SafeURL(a.AgentsJS) }></script>
+	<script src={ templ.SafeURL(a.DashboardJS) }></script>
+	<script src={ templ.SafeURL(a.LogsJS) }></script>
+	<script src={ templ.SafeURL(a.CronsJS) }></script>
+	<script src={ templ.SafeURL(a.EventsJS) }></script>
+	<script src={ templ.SafeURL(a.ChatJS) }></script>
+	<script src={ templ.SafeURL(a.WorkspaceJS) }></script>
+	<script src={ templ.SafeURL(a.SessionsJS) }></script>
+}
