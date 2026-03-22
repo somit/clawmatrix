@@ -1,0 +1,162 @@
+package ui
+
+templ DashboardTab() {
+	<section id="dashboard-tab" class="active">
+		<div class="section-header">
+			<h2>Dashboard</h2>
+			<div class="filter-bar">
+				<select id="dashboard-template-filter" onchange="loadDashboard()">
+					<option value="">All registrations</option>
+				</select>
+				<div class="time-range-bar" id="dashboard-time-range">
+					<button class="active" onclick="setDashboardRange('1h', this)">1h</button>
+					<button onclick="setDashboardRange('6h', this)">6h</button>
+					<button onclick="setDashboardRange('24h', this)">24h</button>
+					<button onclick="setDashboardRange('168h', this)">7d</button>
+				</div>
+			</div>
+		</div>
+		<div id="dashboard-kpis"></div>
+		<div id="dashboard-charts"></div>
+		<div id="dashboard-events"></div>
+	</section>
+}
+
+templ AgentsTab() {
+	<section id="agents-tab">
+		<div class="section-header">
+			<h2>Agents</h2>
+			<div class="filter-bar">
+				<select id="template-filter" onchange="loadAgents()">
+					<option value="">All registrations</option>
+				</select>
+				<button class="btn btn-sm" onclick="loadAgents()">Refresh</button>
+			</div>
+		</div>
+		<div id="agent-detail" style="display:none"></div>
+		<div id="agents-list"></div>
+	</section>
+}
+
+templ RegistrationsTab() {
+	<section id="registrations-tab">
+		<div class="section-header">
+			<h2>Registrations</h2>
+			<button class="btn btn-primary" onclick="showCreateRegistrationModal()">+ New Registration</button>
+		</div>
+		<div id="registrations-list"></div>
+	</section>
+}
+
+templ ProfilesTab() {
+	<section id="templates-tab">
+		<div class="section-header">
+			<h2>Agent Profiles</h2>
+			<button class="btn btn-primary" onclick="showCreateTemplateModal()">+ New Profile</button>
+		</div>
+		<div id="templates-list"></div>
+	</section>
+}
+
+templ ConnectionsTab() {
+	<section id="connections-tab">
+		<div class="section-header">
+			<h2>Connections</h2>
+			<button class="btn btn-primary" onclick="showCreateConnectionModal()">+ New Connection</button>
+		</div>
+		<div id="connections-list"></div>
+	</section>
+}
+
+templ LogsTab() {
+	<section id="logs-tab">
+		<div class="section-header">
+			<h2>Network Logs</h2>
+			<div class="filter-bar">
+				<select id="log-template-filter" onchange="loadLogs()">
+					<option value="">All registrations</option>
+				</select>
+				<button class="btn btn-sm" onclick="loadLogs()">Refresh</button>
+			</div>
+		</div>
+		<div class="subtab-bar">
+			<button class="subtab active" id="subtab-domains" onclick="showLogsSubtab('domains', this)">Top Domains</button>
+			<button class="subtab" id="subtab-requests" onclick="showLogsSubtab('requests', this)">Recent Requests</button>
+		</div>
+		<div id="logs-panel-domains">
+			<div class="subtab-toolbar">
+				<div class="time-range-bar" id="stats-time-range">
+					<button onclick="setStatsRange('1h', this)">1h</button>
+					<button onclick="setStatsRange('6h', this)">6h</button>
+					<button class="active" onclick="setStatsRange('24h', this)">24h</button>
+					<button onclick="setStatsRange('168h', this)">7d</button>
+				</div>
+			</div>
+			<div id="logs-domain-stats"></div>
+		</div>
+		<div id="logs-panel-requests" style="display:none">
+			<div class="subtab-toolbar">
+				<select id="log-action-filter" onchange="loadLogEntriesFromUI()">
+					<option value="">All</option>
+					<option value="allowed">Allowed</option>
+					<option value="blocked">Blocked</option>
+				</select>
+				<input id="log-domain-filter" placeholder="Filter domain..." style="width:160px" onkeydown="if(event.key==='Enter')loadLogEntriesFromUI()"/>
+				<div class="time-range-bar" id="logs-time-range">
+					<button onclick="setLogsRange('1h', this)">1h</button>
+					<button onclick="setLogsRange('6h', this)">6h</button>
+					<button class="active" onclick="setLogsRange('24h', this)">24h</button>
+					<button onclick="setLogsRange('168h', this)">7d</button>
+				</div>
+			</div>
+			<div id="logs-entries"></div>
+		</div>
+	</section>
+}
+
+templ CronsTab() {
+	<section id="crons-tab">
+		<div class="section-header">
+			<h2>Cron Jobs</h2>
+			<div class="filter-bar">
+				<select id="cron-template-filter" onchange="loadCrons()">
+					<option value="">All registrations</option>
+				</select>
+				<button class="btn btn-sm" onclick="loadCrons()">Refresh</button>
+				<button class="btn btn-primary" onclick="showCreateCronModal()">+ New Cron</button>
+			</div>
+		</div>
+		<div id="crons-list"></div>
+	</section>
+}
+
+templ EventsTab() {
+	<section id="events-tab">
+		<div class="section-header">
+			<h2>Audit Events</h2>
+			<div class="filter-bar">
+				<select id="event-type-filter" onchange="loadEventsTab()">
+					<option value="">All events</option>
+					<option value="agent:registered">Agent Registered</option>
+					<option value="agent:stale">Agent Stale</option>
+					<option value="agent:recovered">Agent Recovered</option>
+					<option value="agent:killed">Agent Killed</option>
+					<option value="log:batch">Log Batch</option>
+					<option value="registration:created">Registration Created</option>
+					<option value="registration:updated">Registration Updated</option>
+					<option value="connection:created">Connection Created</option>
+					<option value="connection:deleted">Connection Deleted</option>
+					<option value="template:created">Profile Created</option>
+					<option value="template:updated">Profile Updated</option>
+				</select>
+				<div class="time-range-bar" id="events-time-range">
+					<button class="active" onclick="setEventsRange('1h', this)">1h</button>
+					<button onclick="setEventsRange('24h', this)">24h</button>
+					<button onclick="setEventsRange('168h', this)">7d</button>
+				</div>
+				<button class="btn btn-sm" onclick="loadEventsTab()">Refresh</button>
+			</div>
+		</div>
+		<div id="events-list"></div>
+	</section>
+}

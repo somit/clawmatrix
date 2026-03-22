@@ -1,0 +1,52 @@
+package ui
+
+// Header renders the top bar with logo, health indicator, and controls.
+templ Header() {
+	<header>
+		<div class="container">
+			<div class="left">
+				<h1>
+					@templ.Raw(svgHeaderLogo)
+					CLAWMATRIX
+				</h1>
+				<div class="health" id="health"></div>
+			</div>
+			<div class="header-right">
+				<select id="tz-select" class="tz-select" onchange="onTZChange(this.value)" title="Display timezone"></select>
+				<button class="logout-btn" onclick="doLogout()">Logout</button>
+			</div>
+		</div>
+	</header>
+}
+
+// Nav renders the primary tab navigation bar.
+templ Nav() {
+	<nav>
+		<div class="container">
+			<button class="active" onclick="showTab('dashboard', this)">Dashboard</button>
+			<button onclick="showTab('agents', this)">Agents</button>
+			<button onclick="showTab('registrations', this)">Registrations</button>
+			<button onclick="showTab('templates', this)">Profiles</button>
+			<button onclick="showTab('connections', this)">Connections</button>
+			<button onclick="showTab('logs', this)">Network Logs</button>
+			<button onclick="showTab('crons', this)">Crons</button>
+			<button onclick="showTab('events', this)">Events</button>
+		</div>
+	</nav>
+}
+
+// Main renders the content area, composing all tab sections.
+templ Main() {
+	<main>
+		<div class="container">
+			@DashboardTab()
+			@AgentsTab()
+			@RegistrationsTab()
+			@ProfilesTab()
+			@ConnectionsTab()
+			@LogsTab()
+			@CronsTab()
+			@EventsTab()
+		</div>
+	</main>
+}

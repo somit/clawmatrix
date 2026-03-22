@@ -1,20 +1,23 @@
 package ui
 
+//go:generate templ generate
+
 import (
 	"embed"
 	"io/fs"
 	"net/http"
 )
 
-//go:embed index.html style.css js
+//go:embed style.css js
 var content embed.FS
 
-// Handler serves index.html at the root path.
+var assets = computeAssets(content)
+
+// Handler serves the control plane UI by rendering the templ Page component.
 func Handler() http.HandlerFunc {
-	b, _ := content.ReadFile("index.html")
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.Write(b)
+		Page(assets).Render(r.Context(), w)
 	}
 }
 

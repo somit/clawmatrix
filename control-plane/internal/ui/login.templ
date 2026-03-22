@@ -1,0 +1,23 @@
+package ui
+
+// Login renders the login screen, shown before authentication.
+templ Login() {
+	<div class="login-screen" id="login-screen">
+		<div class="login-box">
+			<div class="logo">
+				@templ.Raw(svgLoginLogo)
+			</div>
+			<h1>CLAWMATRIX</h1>
+			<p>Enter admin token to access the control plane</p>
+			<input
+				type="password"
+				id="login-token"
+				placeholder="Admin token"
+				autofocus
+				onkeydown="if(event.key==='Enter')doLogin()"
+			/>
+			<button class="login-btn" onclick="doLogin()" id="login-btn">Sign in</button>
+			<div class="login-error" id="login-error"></div>
+		</div>
+	</div>
+}
