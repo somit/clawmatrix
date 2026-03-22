@@ -11,6 +11,12 @@ type Config struct {
 	// TLS (Let's Encrypt) — optional; only active when TLSDomain is set
 	TLSDomain string // e.g. "cp.example.com"
 	TLSEmail  string // optional, for LE expiry notifications
+	// OIDC — optional; any compliant provider (Google, Okta, Keycloak, etc.)
+	OIDCIssuerURL       string // e.g. "https://accounts.google.com"
+	OIDCClientID        string
+	OIDCClientSecret    string
+	OIDCRedirectBaseURL string // e.g. "https://cp.example.com" (no trailing slash)
+	OIDCProvider        string // google | github | microsoft | okta | keycloak | custom
 }
 
 func Load() *Config {
@@ -27,13 +33,18 @@ func Load() *Config {
 	}
 
 	return &Config{
-		JWTSecret:       os.Getenv("JWT_SECRET"),
-		DB:              db,
-		DBURI:           dbURI,
-		Listen:          envOr("LISTEN", ":8080"),
-		BootstrapConfig: os.Getenv("BOOTSTRAP_CONFIG"),
-		TLSDomain:       os.Getenv("TLS_DOMAIN"),
-		TLSEmail:        os.Getenv("TLS_EMAIL"),
+		JWTSecret:           os.Getenv("JWT_SECRET"),
+		DB:                  db,
+		DBURI:               dbURI,
+		Listen:              envOr("LISTEN", ":8080"),
+		BootstrapConfig:     os.Getenv("BOOTSTRAP_CONFIG"),
+		TLSDomain:           os.Getenv("TLS_DOMAIN"),
+		TLSEmail:            os.Getenv("TLS_EMAIL"),
+		OIDCIssuerURL:       os.Getenv("OIDC_ISSUER_URL"),
+		OIDCClientID:        os.Getenv("OIDC_CLIENT_ID"),
+		OIDCClientSecret:    os.Getenv("OIDC_CLIENT_SECRET"),
+		OIDCRedirectBaseURL: os.Getenv("OIDC_REDIRECT_BASE_URL"),
+		OIDCProvider:        envOr("OIDC_PROVIDER", "custom"),
 	}
 }
 

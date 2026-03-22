@@ -1,11 +1,10 @@
 module control-plane
 
-go 1.24.0
-
-toolchain go1.24.5
+go 1.25.0
 
 require (
 	github.com/a-h/templ v0.3.1001
+	github.com/coreos/go-oidc/v3 v3.12.0
 	github.com/glebarez/sqlite v1.11.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/joho/godotenv v1.5.1
@@ -17,6 +16,7 @@ require (
 	go.opentelemetry.io/otel/metric v1.33.0
 	go.opentelemetry.io/otel/sdk/metric v1.33.0
 	golang.org/x/crypto v0.46.0
+	golang.org/x/oauth2 v0.34.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/gorm v1.25.12
 )
@@ -27,6 +27,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/glebarez/go-sqlite v1.21.2 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect

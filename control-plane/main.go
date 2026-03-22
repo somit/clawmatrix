@@ -62,7 +62,21 @@ func main() {
 
 	go worker.StaleLoop(hub)
 
-	router := api.NewRouter(hub, scheduler)
+	oidcCfg, err := api.NewOIDCConfig(
+		cfg.OIDCIssuerURL,
+		cfg.OIDCClientID,
+		cfg.OIDCClientSecret,
+		cfg.OIDCRedirectBaseURL,
+		cfg.OIDCProvider,
+	)
+	if err != nil {
+		log.Fatalf("OIDC init: %v", err)
+	}
+	if oidcCfg != nil {
+		log.Printf("OIDC enabled (issuer: %s)", cfg.OIDCIssuerURL)
+	}
+
+	router := api.NewRouter(hub, scheduler, oidcCfg)
 	fmt.Println(`
 +--------------------+
 |    ClawMatrix      |
@@ -117,7 +131,7 @@ func runCreateAdmin(cfg *config.Config) {
 		log.Fatalf("admin role not found (database not initialized?): %v", err)
 	}
 
-	u, err := database.CreateUser(*username, *password, &adminRoleID)
+	u, err := database.CreateUser(*username, *password, &adminRoleID, nil)
 	if err != nil {
 		log.Fatalf("create user: %v", err)
 	}

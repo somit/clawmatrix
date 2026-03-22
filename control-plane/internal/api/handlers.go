@@ -33,12 +33,13 @@ type CronScheduler interface {
 type Handlers struct {
 	hub       *Hub
 	scheduler CronScheduler
+	oidc      *OIDCConfig
 }
 
 type J = map[string]any
 
-func NewHandlers(hub *Hub, scheduler CronScheduler) *Handlers {
-	return &Handlers{hub: hub, scheduler: scheduler}
+func NewHandlers(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) *Handlers {
+	return &Handlers{hub: hub, scheduler: scheduler, oidc: oidc}
 }
 
 // --- Admin ---

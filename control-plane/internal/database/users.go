@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func CreateUser(username, password string, systemRoleID *uint) (*User, error) {
+func CreateUser(username, password string, systemRoleID *uint, email *string) (*User, error) {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -15,12 +15,24 @@ func CreateUser(username, password string, systemRoleID *uint) (*User, error) {
 	u := &User{
 		Username:     username,
 		PasswordHash: string(hash),
+		Email:        email,
 		SystemRoleID: systemRoleID,
 	}
 	if err := DB.Create(u).Error; err != nil {
 		return nil, err
 	}
 	return u, nil
+}
+
+func GetUserByEmail(email string) (*User, error) {
+	var u User
+	if err := DB.Preload("SystemRole.Permissions").Where("email = ?", email).First(&u).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &u, nil
 }
 
 func GetUserByUsername(username string) (*User, error) {
@@ -183,6 +195,28 @@ func ListProfileACL(profileName string) ([]AgentProfileACL, error) {
 func UserCount() (int64, error) {
 	var count int64
 	return count, DB.Model(&User{}).Count(&count).Error
+}
+
+// LinkUserIdentity associates an external provider identity with a user.
+func LinkUserIdentity(userID uint, provider, externalID string) error {
+	identity := UserIdentity{UserID: userID, Provider: provider, ExternalID: externalID}
+	return DB.Where(UserIdentity{UserID: userID, Provider: provider}).
+		Assign(UserIdentity{ExternalID: externalID}).
+		FirstOrCreate(&identity).Error
+}
+
+// ListUserIdentities returns all external identities linked to a user.
+func ListUserIdentities(userID uint) ([]UserIdentity, error) {
+	var identities []UserIdentity
+	if err := DB.Where("user_id = ?", userID).Find(&identities).Error; err != nil {
+		return nil, err
+	}
+	return identities, nil
+}
+
+// UnlinkUserIdentity removes a specific provider identity from a user.
+func UnlinkUserIdentity(userID uint, provider string) error {
+	return DB.Where("user_id = ? AND provider = ?", userID, provider).Delete(&UserIdentity{}).Error
 }
 
 // GetUserByExternalIdentity resolves an external provider identity to a user.

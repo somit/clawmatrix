@@ -10,8 +10,8 @@ import (
 	"control-plane/internal/ui"
 )
 
-func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
-	h := NewHandlers(hub, scheduler)
+func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler {
+	h := NewHandlers(hub, scheduler, oidc)
 
 	mux := http.NewServeMux()
 
@@ -30,12 +30,20 @@ func NewRouter(hub *Hub, scheduler CronScheduler) http.Handler {
 	mux.HandleFunc("POST /auth/login", h.Login)
 	mux.HandleFunc("GET /auth/me", h.withAuth(h.Me))
 
+	// OIDC — public, no auth required
+	mux.HandleFunc("GET /auth/oidc/config", h.OIDCProviderConfig)
+	mux.HandleFunc("GET /auth/oidc/start", h.OIDCStart)
+	mux.HandleFunc("GET /auth/oidc/callback", h.OIDCCallback)
+
 	// Users
 	mux.HandleFunc("GET /users", h.withPerm(database.PermManageUsers, h.ListUsers))
 	mux.HandleFunc("POST /users", h.withPerm(database.PermManageUsers, h.CreateUser))
 	mux.HandleFunc("GET /users/{id}", h.withPerm(database.PermManageUsers, h.GetUser))
 	mux.HandleFunc("PUT /users/{id}", h.withPerm(database.PermManageUsers, h.UpdateUser))
 	mux.HandleFunc("DELETE /users/{id}", h.withPerm(database.PermManageUsers, h.DeleteUser))
+	mux.HandleFunc("GET /users/{id}/identities", h.withPerm(database.PermManageUsers, h.ListUserIdentities))
+	mux.HandleFunc("POST /users/{id}/identities", h.withPerm(database.PermManageUsers, h.LinkUserIdentity))
+	mux.HandleFunc("DELETE /users/{id}/identities/{provider}", h.withPerm(database.PermManageUsers, h.UnlinkUserIdentity))
 
 	// Roles
 	mux.HandleFunc("GET /roles", h.withAuth(h.ListRoles))

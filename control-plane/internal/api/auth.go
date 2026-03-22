@@ -52,6 +52,7 @@ func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, J{
 		"id":          u.ID,
 		"username":    u.Username,
+		"email":       u.Email,
 		"system_role": systemRole,
 		"permissions": perms,
 	})
@@ -66,9 +67,10 @@ func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type userResp struct {
-		ID         uint   `json:"id"`
-		Username   string `json:"username"`
-		SystemRole string `json:"system_role,omitempty"`
+		ID         uint    `json:"id"`
+		Username   string  `json:"username"`
+		Email      *string `json:"email,omitempty"`
+		SystemRole string  `json:"system_role,omitempty"`
 	}
 	out := make([]userResp, len(users))
 	for i, u := range users {
@@ -76,22 +78,23 @@ func (h *Handlers) ListUsers(w http.ResponseWriter, r *http.Request) {
 		if u.SystemRole != nil {
 			role = u.SystemRole.Name
 		}
-		out[i] = userResp{ID: u.ID, Username: u.Username, SystemRole: role}
+		out[i] = userResp{ID: u.ID, Username: u.Username, Email: u.Email, SystemRole: role}
 	}
 	respond(w, 200, out)
 }
 
 func (h *Handlers) CreateUser(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Username     string `json:"username"`
-		Password     string `json:"password"`
-		SystemRoleID *uint  `json:"system_role_id"`
+		Username     string  `json:"username"`
+		Password     string  `json:"password"`
+		Email        *string `json:"email"`
+		SystemRoleID *uint   `json:"system_role_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.Password == "" {
 		respond(w, 400, J{"error": "username and password required"})
 		return
 	}
-	u, err := database.CreateUser(req.Username, req.Password, req.SystemRoleID)
+	u, err := database.CreateUser(req.Username, req.Password, req.SystemRoleID, req.Email)
 	if err != nil {
 		respond(w, 409, J{"error": err.Error()})
 		return
@@ -114,7 +117,7 @@ func (h *Handlers) GetUser(w http.ResponseWriter, r *http.Request) {
 	if u.SystemRole != nil {
 		role = u.SystemRole.Name
 	}
-	respond(w, 200, J{"id": u.ID, "username": u.Username, "system_role": role})
+	respond(w, 200, J{"id": u.ID, "username": u.Username, "email": u.Email, "system_role": role})
 }
 
 func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +128,7 @@ func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	}
 	var req struct {
 		Password     *string `json:"password"`
+		Email        *string `json:"email"`
 		SystemRoleID *uint   `json:"system_role_id"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -134,6 +138,13 @@ func (h *Handlers) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	updates := map[string]any{}
 	if req.SystemRoleID != nil {
 		updates["system_role_id"] = req.SystemRoleID
+	}
+	if req.Email != nil {
+		if *req.Email == "" {
+			updates["email"] = nil
+		} else {
+			updates["email"] = req.Email
+		}
 	}
 	if req.Password != nil && *req.Password != "" {
 		hash, err := hashPassword(*req.Password)
@@ -167,6 +178,65 @@ func (h *Handlers) DeleteUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := database.DeleteUser(uint(id)); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
+// --- User Identities ---
+
+func (h *Handlers) ListUserIdentities(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	identities, err := database.ListUserIdentities(uint(id))
+	if err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	out := make([]J, len(identities))
+	for i, ident := range identities {
+		out[i] = J{"provider": ident.Provider, "external_id": ident.ExternalID}
+	}
+	respond(w, 200, out)
+}
+
+func (h *Handlers) LinkUserIdentity(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	var req struct {
+		Provider   string `json:"provider"`
+		ExternalID string `json:"external_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Provider == "" || req.ExternalID == "" {
+		respond(w, 400, J{"error": "provider and external_id required"})
+		return
+	}
+	if err := database.LinkUserIdentity(uint(id), req.Provider, req.ExternalID); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
+func (h *Handlers) UnlinkUserIdentity(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
+		return
+	}
+	provider := r.PathValue("provider")
+	if provider == "" {
+		respond(w, 400, J{"error": "provider required"})
+		return
+	}
+	if err := database.UnlinkUserIdentity(uint(id), provider); err != nil {
 		respond(w, 500, J{"error": err.Error()})
 		return
 	}

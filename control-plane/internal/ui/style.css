@@ -119,6 +119,11 @@ body {
 
 .login-box .login-btn:hover { opacity: 0.88; box-shadow: 0 4px 16px var(--accent-glow-2); }
 .login-box .login-btn:disabled { opacity: 0.4; cursor: not-allowed; box-shadow: none; }
+.login-btn-sso { background: var(--surface-2) !important; border: 1px solid var(--border) !important; color: var(--text) !important; margin-top: 0; display: flex; align-items: center; justify-content: center; }
+.login-btn-sso:hover { border-color: var(--border-2) !important; opacity: 1 !important; background: #1e2e45 !important; }
+.oidc-btn-icon { display: inline-flex; align-items: center; margin-right: 8px; flex-shrink: 0; }
+.login-divider { display: flex; align-items: center; gap: 10px; margin: 4px 0; color: var(--muted); font-size: 12px; }
+.login-divider::before, .login-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
 .login-error {
   font-size: 13px;
@@ -463,8 +468,8 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 28px;
-  width: 480px;
-  max-width: 92vw;
+  width: 580px;
+  max-width: 94vw;
   max-height: 90vh;
   overflow-y: auto;
   display: flex;

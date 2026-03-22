@@ -24,6 +24,8 @@ templ Login() {
 			/>
 			<button class="login-btn" onclick="doLogin()" id="login-btn">Sign in</button>
 			<div class="login-error" id="login-error"></div>
+			<div class="login-divider" id="oidc-divider" style="display:none"><span>or</span></div>
+			<button class="login-btn login-btn-sso" id="oidc-btn" style="display:none" onclick="doOIDCLogin()"></button>
 		</div>
 	</div>
 }
