@@ -16,7 +16,8 @@ type RegisteredAgent struct {
 	sessionsPath      string // sessions directory
 	agentCmd          string // e.g. "openclaw agent --agent cto"
 	isDefault         bool
-	mu                sync.Mutex // serializes subprocess invocations (prevents concurrent session file conflicts)
+	claudeSessions    map[string]string // maps clutch session ID → claude session_id for --resume
+	mu                sync.Mutex        // serializes subprocess invocations (prevents concurrent session file conflicts)
 }
 
 // Accessor methods for use outside the package.

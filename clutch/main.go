@@ -213,13 +213,21 @@ func main() {
 	}
 
 	// Start the HTTP server immediately so the port is reachable during
-	// registration retries.
+	// registration retries. Fatal to main if the port cannot be bound.
+	srvErr := make(chan error, 1)
 	go func() {
 		log.Printf("clutch %s on %s", gatewayVersion, *listen)
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatal(err)
+			srvErr <- err
 		}
 	}()
+	// Give the server a moment to bind; exit immediately on failure (e.g. port in use).
+	select {
+	case err := <-srvErr:
+		log.Fatalf("server: %v", err)
+	case <-time.After(500 * time.Millisecond):
+		// bound successfully, continue
+	}
 
 	if clutch.CpURL != "" && clutch.CpToken != "" {
 		clutch.Register()

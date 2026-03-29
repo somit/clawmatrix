@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -55,6 +56,11 @@ func handleAskForAgent(w http.ResponseWriter, r *http.Request, agent *Registered
 	if session == "" {
 		session = "cli:default"
 	}
+	// Normalise: if the session key looks like a Claude session file (uuid.jsonl)
+	// and we have a direct mapping for the raw UUID, remap to the original key.
+	// This handles the case where the UI derives the session key from the JSONL
+	// filename after Claude creates a new session file on resume.
+	session = normalizeSession(agent, session)
 
 	timeout := AgentTimeout
 	if req.Timeout > 0 {
@@ -86,6 +92,9 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 	// WaitDelay force-closes stdout/stderr pipes 5s after the process exits.
 	cmd.WaitDelay = 5 * time.Second
 	cmd.Env = runner.Env()
+	if agent.workspace != "" {
+		cmd.Dir = agent.workspace
+	}
 	if runner.UsesStdin() {
 		cmd.Stdin = strings.NewReader(msg)
 	}
@@ -121,6 +130,15 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 	}
 
 	response, thinking, usage := runner.ParseOutput(stdout.String(), stderr.String())
+
+	// Persist the Claude session ID so the next request can --resume it.
+	if claudeSessionID, _ := usage["session_id"].(string); claudeSessionID != "" {
+		if agent.claudeSessions == nil {
+			agent.claudeSessions = map[string]string{}
+		}
+		agent.claudeSessions[session] = claudeSessionID
+		log.Printf("session stored: clutch=%q claude=%q", session, claudeSessionID)
+	}
 
 	if response == "" && thinking == "" {
 		WriteJSON(w, 502, AskResponse{

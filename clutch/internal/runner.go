@@ -27,6 +27,10 @@ type AgentRunner interface {
 	// ParseOutput extracts response, thinking, and usage from stdout/stderr.
 	ParseOutput(stdout, stderr string) (response, thinking string, usage map[string]any)
 
+	// ParseSessionLine extracts role and content from a single decoded JSONL line.
+	// Returns ok=false for lines that should be skipped (e.g. non-message entries).
+	ParseSessionLine(entry map[string]any) (role, content string, ok bool)
+
 	// AgentCmd returns the command string to store on a RegisteredAgent for localID.
 	AgentCmd(localID string) string
 
@@ -45,6 +49,8 @@ func newRunner() AgentRunner {
 		return &picoclawRunner{}
 	case "openclaw":
 		return &openclawRunner{}
+	case "claude-code":
+		return &claudeCodeRunner{}
 	default:
 		return &genericRunner{}
 	}
@@ -64,4 +70,7 @@ func (g *genericRunner) AgentCmd(_ string) string                          { ret
 func (g *genericRunner) SessionsPath(_ string) string                      { return SessionsPath }
 func (g *genericRunner) ParseOutput(stdout, _ string) (string, string, map[string]any) {
 	return trimSpace(stdout), "", nil
+}
+func (g *genericRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
+	return parseOpenclawSessionLine(entry)
 }

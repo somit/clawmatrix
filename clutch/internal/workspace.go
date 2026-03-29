@@ -61,7 +61,8 @@ func serveWorkspace(w http.ResponseWriter, r *http.Request, wsPath string) {
 		}
 		out := make([]fileEntry, 0, len(entries))
 		for _, e := range entries {
-			if strings.HasPrefix(e.Name(), ".") {
+			// Hide dotfiles except .claude (skills/commands live there)
+			if strings.HasPrefix(e.Name(), ".") && e.Name() != ".claude" {
 				continue
 			}
 			eInfo, err := e.Info()
@@ -277,22 +278,8 @@ func serveSessions(w http.ResponseWriter, r *http.Request, sessPath string) {
 		return
 	}
 
-	// JSONL files (openclaw): parse line-by-line into {messages:[...]} shape.
-	// Also handles .jsonl.deleted.* variants (openclaw soft-delete naming).
+	// JSONL files: delegate line parsing to the runner (each runner owns its format).
 	if strings.Contains(clean, ".jsonl") {
-		type contentBlock struct {
-			Type string `json:"type"`
-			Text string `json:"text"`
-		}
-		type rawMessage struct {
-			Role    string         `json:"role"`
-			Content []contentBlock `json:"content"`
-		}
-		type jsonlEntry struct {
-			Type      string     `json:"type"`
-			Timestamp string     `json:"timestamp"`
-			Message   rawMessage `json:"message"`
-		}
 		type outMsg struct {
 			Role    string `json:"role"`
 			Content string `json:"content"`
@@ -301,29 +288,21 @@ func serveSessions(w http.ResponseWriter, r *http.Request, sessPath string) {
 			Messages []outMsg `json:"messages"`
 		}
 
+		runner := newRunner()
 		var msgs []outMsg
 		for _, line := range strings.Split(string(data), "\n") {
 			line = strings.TrimSpace(line)
 			if line == "" {
 				continue
 			}
-			var entry jsonlEntry
+			var entry map[string]any
 			if err := json.Unmarshal([]byte(line), &entry); err != nil {
 				continue
 			}
-			if entry.Type != "message" {
-				continue
+			role, content, ok := runner.ParseSessionLine(entry)
+			if ok {
+				msgs = append(msgs, outMsg{Role: role, Content: content})
 			}
-			var texts []string
-			for _, b := range entry.Message.Content {
-				if b.Type == "text" && strings.TrimSpace(b.Text) != "" {
-					texts = append(texts, b.Text)
-				}
-			}
-			msgs = append(msgs, outMsg{
-				Role:    entry.Message.Role,
-				Content: strings.Join(texts, "\n"),
-			})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(sessionOut{Messages: msgs})
