@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -56,28 +55,24 @@ func handleAskForAgent(w http.ResponseWriter, r *http.Request, agent *Registered
 	if session == "" {
 		session = "cli:default"
 	}
-	// Normalise: if the session key looks like a Claude session file (uuid.jsonl)
-	// and we have a direct mapping for the raw UUID, remap to the original key.
-	// This handles the case where the UI derives the session key from the JSONL
-	// filename after Claude creates a new session file on resume.
-	session = normalizeSession(agent, session)
+	runner := newRunner()
+	session = runner.NormalizeSession(agent.id, session)
 
 	timeout := AgentTimeout
 	if req.Timeout > 0 {
 		timeout = time.Duration(req.Timeout) * time.Second
 	}
 
-	runSubprocess(w, r, agent, msg, session, timeout)
+	runSubprocess(w, r, runner, agent, msg, session, timeout)
 }
 
 // runSubprocess spawns the agent command and writes the result to w.
-func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgent, msg, session string, timeout time.Duration) {
+func runSubprocess(w http.ResponseWriter, r *http.Request, runner AgentRunner, agent *RegisteredAgent, msg, session string, timeout time.Duration) {
 	if agent.agentCmd == "" {
 		WriteJSON(w, 404, AskResponse{Status: "error", Error: "agent executor not configured"})
 		return
 	}
 
-	runner := newRunner()
 	runner.PrepareSession(agent, session)
 	parts := runner.CommandArgs(agent, msg, session)
 
@@ -131,13 +126,9 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 
 	response, thinking, usage := runner.ParseOutput(stdout.String(), stderr.String())
 
-	// Persist the Claude session ID so the next request can --resume it.
+	// Persist runner-specific session mapping for resumption.
 	if claudeSessionID, _ := usage["session_id"].(string); claudeSessionID != "" {
-		if agent.claudeSessions == nil {
-			agent.claudeSessions = map[string]string{}
-		}
-		agent.claudeSessions[session] = claudeSessionID
-		log.Printf("session stored: clutch=%q claude=%q", session, claudeSessionID)
+		runner.StoreSession(agent.id, session, claudeSessionID)
 	}
 
 	if response == "" && thinking == "" {

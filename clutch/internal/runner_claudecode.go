@@ -6,6 +6,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+)
+
+// claudeCodeSessions maps agentID → clutchSession → claudeSessionID.
+// Owned entirely by the claude-code runner; no other package touches it.
+var (
+	claudeCodeSessions   = map[string]map[string]string{}
+	claudeCodeSessionsMu sync.Mutex
 )
 
 // claudeCodeRunner handles Claude Code CLI subprocess execution.
@@ -25,13 +33,44 @@ func (c *claudeCodeRunner) CommandArgs(agent *RegisteredAgent, msg, session stri
 		args = append(args, "--add-dir", agent.workspace)
 	}
 	// Resume an existing session if we have a mapping from a prior request.
-	if agent.claudeSessions != nil {
-		if claudeID, ok := agent.claudeSessions[session]; ok && claudeID != "" {
-			args = append(args, "--resume", claudeID)
-			log.Printf("resuming session: clutch=%q claude=%q", session, claudeID)
-		}
+	claudeCodeSessionsMu.Lock()
+	claudeID := claudeCodeSessions[agent.id][session]
+	claudeCodeSessionsMu.Unlock()
+	if claudeID != "" {
+		args = append(args, "--resume", claudeID)
+		log.Printf("resuming session: clutch=%q claude=%q", session, claudeID)
 	}
 	return args
+}
+
+func (c *claudeCodeRunner) StoreSession(agentID, clutchSession, claudeSession string) {
+	claudeCodeSessionsMu.Lock()
+	defer claudeCodeSessionsMu.Unlock()
+	if claudeCodeSessions[agentID] == nil {
+		claudeCodeSessions[agentID] = map[string]string{}
+	}
+	claudeCodeSessions[agentID][clutchSession] = claudeSession
+	log.Printf("session stored: clutch=%q claude=%q", clutchSession, claudeSession)
+}
+
+func (c *claudeCodeRunner) NormalizeSession(agentID, session string) string {
+	claudeCodeSessionsMu.Lock()
+	defer claudeCodeSessionsMu.Unlock()
+	sessions := claudeCodeSessions[agentID]
+	if sessions == nil {
+		return session
+	}
+	if _, ok := sessions[session]; ok {
+		return session
+	}
+	bare := strings.TrimSuffix(session, ".jsonl")
+	for clutchKey, claudeID := range sessions {
+		if claudeID == bare || claudeID+".jsonl" == session {
+			log.Printf("session normalised: %q → %q (claude=%q)", session, clutchKey, claudeID)
+			return clutchKey
+		}
+	}
+	return session
 }
 
 func (c *claudeCodeRunner) UsesStdin() bool { return false }
@@ -83,30 +122,6 @@ func (c *claudeCodeRunner) SessionsPath(localID string) string {
 
 func (c *claudeCodeRunner) DiscoverAgents() []agentDiscovery {
 	return discoverClaudeCodeAgents()
-}
-
-// normalizeSession maps a UI-derived session key back to the original clutch
-// session key when the UI has switched to using the Claude session filename.
-// e.g. UI sends "ebe0898e-....jsonl" but the stored mapping is
-// "39f6b730-....jsonl" → "ebe0898e-...". We detect this and return the
-// original key so --resume keeps working.
-func normalizeSession(agent *RegisteredAgent, session string) string {
-	if agent.claudeSessions == nil {
-		return session
-	}
-	// Already have a direct mapping — no normalisation needed.
-	if _, ok := agent.claudeSessions[session]; ok {
-		return session
-	}
-	// Strip .jsonl suffix and check if it matches any stored Claude session ID.
-	bare := strings.TrimSuffix(session, ".jsonl")
-	for clutchKey, claudeID := range agent.claudeSessions {
-		if claudeID == bare || claudeID+".jsonl" == session {
-			log.Printf("session normalised: %q → %q (claude=%q)", session, clutchKey, claudeID)
-			return clutchKey
-		}
-	}
-	return session
 }
 
 // writeClaudeAllowlist writes the egress allowlist from the control plane to

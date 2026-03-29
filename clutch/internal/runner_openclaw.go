@@ -60,6 +60,9 @@ func (o *openclawRunner) DiscoverAgents() []agentDiscovery {
 	return discoverOpenclawAgents()
 }
 
+func (o *openclawRunner) StoreSession(_, _, _ string)               {}
+func (o *openclawRunner) NormalizeSession(_, session string) string { return session }
+
 func (o *openclawRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
 	return parseOpenclawSessionLine(entry)
 }

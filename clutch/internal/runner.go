@@ -40,6 +40,14 @@ type AgentRunner interface {
 	// DiscoverAgents reads runner-specific config and returns all configured agents.
 	// Returns nil for single-agent runners (picoclaw, generic).
 	DiscoverAgents() []agentDiscovery
+
+	// StoreSession persists a runner-specific session mapping after a completed run.
+	// No-op for runners that don't use session resumption.
+	StoreSession(agentID, clutchSession, runnerSession string)
+
+	// NormalizeSession maps a potentially-aliased session key back to the canonical
+	// clutch session key. Returns session unchanged if no mapping exists.
+	NormalizeSession(agentID, session string) string
 }
 
 // newRunner returns the AgentRunner for the current Runner global.
@@ -74,3 +82,5 @@ func (g *genericRunner) ParseOutput(stdout, _ string) (string, string, map[strin
 func (g *genericRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
 	return parseOpenclawSessionLine(entry)
 }
+func (g *genericRunner) StoreSession(_, _, _ string)            {}
+func (g *genericRunner) NormalizeSession(_, session string) string { return session }
