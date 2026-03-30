@@ -27,6 +27,10 @@ type AgentRunner interface {
 	// ParseOutput extracts response, thinking, and usage from stdout/stderr.
 	ParseOutput(stdout, stderr string) (response, thinking string, usage map[string]any)
 
+	// ParseSessionLine extracts role and content from a single decoded JSONL line.
+	// Returns ok=false for lines that should be skipped (e.g. non-message entries).
+	ParseSessionLine(entry map[string]any) (role, content string, ok bool)
+
 	// AgentCmd returns the command string to store on a RegisteredAgent for localID.
 	AgentCmd(localID string) string
 
@@ -36,6 +40,14 @@ type AgentRunner interface {
 	// DiscoverAgents reads runner-specific config and returns all configured agents.
 	// Returns nil for single-agent runners (picoclaw, generic).
 	DiscoverAgents() []agentDiscovery
+
+	// StoreSession persists a runner-specific session mapping after a completed run.
+	// No-op for runners that don't use session resumption.
+	StoreSession(agentID, clutchSession, runnerSession string)
+
+	// NormalizeSession maps a potentially-aliased session key back to the canonical
+	// clutch session key. Returns session unchanged if no mapping exists.
+	NormalizeSession(agentID, session string) string
 }
 
 // newRunner returns the AgentRunner for the current Runner global.
@@ -45,6 +57,8 @@ func newRunner() AgentRunner {
 		return &picoclawRunner{}
 	case "openclaw":
 		return &openclawRunner{}
+	case "claude-code":
+		return &claudeCodeRunner{}
 	default:
 		return &genericRunner{}
 	}
@@ -65,3 +79,8 @@ func (g *genericRunner) SessionsPath(_ string) string                      { ret
 func (g *genericRunner) ParseOutput(stdout, _ string) (string, string, map[string]any) {
 	return trimSpace(stdout), "", nil
 }
+func (g *genericRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
+	return parseOpenclawSessionLine(entry)
+}
+func (g *genericRunner) StoreSession(_, _, _ string)            {}
+func (g *genericRunner) NormalizeSession(_, session string) string { return session }

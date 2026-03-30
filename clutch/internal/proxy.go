@@ -42,6 +42,25 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// /allowlist — returns current egress allowlist for PreToolUse hooks
+		if r.URL.Path == "/allowlist" && r.Method == http.MethodGet {
+			domains, _ := Allowlist.Load().([]string)
+			if domains == nil {
+				domains = []string{}
+			}
+			w.Header().Set("Content-Type", "application/json")
+			enc := `{"domains":[`
+			for i, d := range domains {
+				if i > 0 {
+					enc += ","
+				}
+				enc += `"` + d + `"`
+			}
+			enc += `]}`
+			fmt.Fprint(w, enc)
+			return
+		}
+
 		if strings.HasPrefix(r.URL.Path, "/ask/") && r.Method == http.MethodPost {
 			if !checkAgentAuth(r) {
 				http.Error(w, `{"status":"error","error":"unauthorized"}`, 401)

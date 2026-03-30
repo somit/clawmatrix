@@ -72,13 +72,17 @@ func Register() {
 				meta[kv[1]] = v
 			}
 		}
-		if _, ok := meta["chatUrl"]; !ok && AgentCmd != "" {
+		if _, ok := meta["chatUrl"]; !ok && (AgentCmd != "" || runner.AgentCmd(PreferredAgentID) != "") {
 			meta["chatUrl"] = HostBaseURL + "/ask/" + PreferredAgentID
 		}
 		if _, ok := meta["workspaceUrl"]; !ok && WorkspacePath != "" {
 			meta["workspaceUrl"] = HostBaseURL + "/workspace/" + PreferredAgentID
 		}
-		if _, ok := meta["sessionsUrl"]; !ok && SessionsPath != "" {
+		sp := SessionsPath
+		if sp == "" {
+			sp = runner.SessionsPath(PreferredAgentID)
+		}
+		if _, ok := meta["sessionsUrl"]; !ok && sp != "" {
 			meta["sessionsUrl"] = HostBaseURL + "/sessions/" + PreferredAgentID
 		}
 		dc := agentDiscovery{ID: PreferredAgentID, Group: PreferredAgentGroup, Default: true, Workspace: WorkspacePath}
@@ -138,6 +142,7 @@ func Register() {
 	if lm := resp.Header.Get("Last-Modified"); lm != "" {
 		LastMod.Store(lm)
 	}
+	writeClaudeAllowlist(result.Allowlist)
 
 	RegisteredAgentsMu.Lock()
 	var finalAgents []RegisteredAgent
@@ -274,6 +279,7 @@ func ConfigPollLoop() {
 			if lm := resp.Header.Get("Last-Modified"); lm != "" {
 				LastMod.Store(lm)
 			}
+			writeClaudeAllowlist(cfg.Allowlist)
 			log.Printf("config updated: %d rules", len(cfg.Allowlist))
 		} else {
 			resp.Body.Close()

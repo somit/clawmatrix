@@ -26,9 +26,14 @@ func (p *picoclawRunner) ParseOutput(stdout, stderr string) (string, string, map
 	return parsePicoclawOutput(stdout), "", parsePicoclawUsage(stderr)
 }
 
-func (p *picoclawRunner) AgentCmd(_ string) string        { return AgentCmd }
-func (p *picoclawRunner) SessionsPath(_ string) string    { return SessionsPath }
-func (p *picoclawRunner) DiscoverAgents() []agentDiscovery { return nil }
+func (p *picoclawRunner) AgentCmd(_ string) string                                    { return AgentCmd }
+func (p *picoclawRunner) SessionsPath(_ string) string                                { return SessionsPath }
+func (p *picoclawRunner) DiscoverAgents() []agentDiscovery                            { return nil }
+func (p *picoclawRunner) StoreSession(_, _, _ string)               {}
+func (p *picoclawRunner) NormalizeSession(_, session string) string { return session }
+func (p *picoclawRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
+	return parseOpenclawSessionLine(entry)
+}
 
 // --- picoclaw output parsing ---
 

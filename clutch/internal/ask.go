@@ -55,23 +55,24 @@ func handleAskForAgent(w http.ResponseWriter, r *http.Request, agent *Registered
 	if session == "" {
 		session = "cli:default"
 	}
+	runner := newRunner()
+	session = runner.NormalizeSession(agent.id, session)
 
 	timeout := AgentTimeout
 	if req.Timeout > 0 {
 		timeout = time.Duration(req.Timeout) * time.Second
 	}
 
-	runSubprocess(w, r, agent, msg, session, timeout)
+	runSubprocess(w, r, runner, agent, msg, session, timeout)
 }
 
 // runSubprocess spawns the agent command and writes the result to w.
-func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgent, msg, session string, timeout time.Duration) {
+func runSubprocess(w http.ResponseWriter, r *http.Request, runner AgentRunner, agent *RegisteredAgent, msg, session string, timeout time.Duration) {
 	if agent.agentCmd == "" {
 		WriteJSON(w, 404, AskResponse{Status: "error", Error: "agent executor not configured"})
 		return
 	}
 
-	runner := newRunner()
 	runner.PrepareSession(agent, session)
 	parts := runner.CommandArgs(agent, msg, session)
 
@@ -86,6 +87,9 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 	// WaitDelay force-closes stdout/stderr pipes 5s after the process exits.
 	cmd.WaitDelay = 5 * time.Second
 	cmd.Env = runner.Env()
+	if agent.workspace != "" {
+		cmd.Dir = agent.workspace
+	}
 	if runner.UsesStdin() {
 		cmd.Stdin = strings.NewReader(msg)
 	}
@@ -121,6 +125,11 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 	}
 
 	response, thinking, usage := runner.ParseOutput(stdout.String(), stderr.String())
+
+	// Persist runner-specific session mapping for resumption.
+	if claudeSessionID, _ := usage["session_id"].(string); claudeSessionID != "" {
+		runner.StoreSession(agent.id, session, claudeSessionID)
+	}
 
 	if response == "" && thinking == "" {
 		WriteJSON(w, 502, AskResponse{

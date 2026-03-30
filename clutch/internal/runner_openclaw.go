@@ -60,6 +60,41 @@ func (o *openclawRunner) DiscoverAgents() []agentDiscovery {
 	return discoverOpenclawAgents()
 }
 
+func (o *openclawRunner) StoreSession(_, _, _ string)               {}
+func (o *openclawRunner) NormalizeSession(_, session string) string { return session }
+
+func (o *openclawRunner) ParseSessionLine(entry map[string]any) (string, string, bool) {
+	return parseOpenclawSessionLine(entry)
+}
+
+// parseOpenclawSessionLine parses openclaw/generic JSONL session format:
+// {"type":"message","message":{"role":"...","content":[{"type":"text","text":"..."}]}}
+func parseOpenclawSessionLine(entry map[string]any) (string, string, bool) {
+	if entry["type"] != "message" {
+		return "", "", false
+	}
+	msg, _ := entry["message"].(map[string]any)
+	if msg == nil {
+		return "", "", false
+	}
+	role, _ := msg["role"].(string)
+	var parts []string
+	if blocks, ok := msg["content"].([]any); ok {
+		for _, b := range blocks {
+			if block, ok := b.(map[string]any); ok && block["type"] == "text" {
+				if t, _ := block["text"].(string); strings.TrimSpace(t) != "" {
+					parts = append(parts, t)
+				}
+			}
+		}
+	}
+	content := strings.Join(parts, "\n")
+	if role == "" || strings.TrimSpace(content) == "" {
+		return "", "", false
+	}
+	return role, content, true
+}
+
 // --- openclaw agent discovery ---
 
 // openclawAgentEntry is an internal representation of one agent in the openclaw config.
