@@ -22,7 +22,7 @@ var (
 type claudeCodeRunner struct{}
 
 func (c *claudeCodeRunner) CommandArgs(agent *RegisteredAgent, msg, session string) []string {
-	args := []string{"claude", "-p", msg, "--output-format", "json", "--verbose", "--bare", "--dangerously-skip-permissions"}
+	args := []string{"claude", "-p", msg, "--output-format", "json", "--dangerously-skip-permissions"}
 	if model := os.Getenv("CLAUDE_MODEL"); model != "" {
 		args = append(args, "--model", model)
 	}
