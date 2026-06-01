@@ -3,9 +3,9 @@ package clutch
 import (
 	"encoding/json"
 	"io"
-	"log"
 	"net/http"
 	"strings"
+	"time"
 )
 
 func handleDelegate(w http.ResponseWriter, r *http.Request) {
@@ -25,14 +25,6 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Same-instance routing: check if target is a local agent
-	if agent := findLocalAgent(target); agent != nil {
-		log.Printf("local delegation to %s (same-instance)", target)
-		LocalDelegateAsk(w, r, agent)
-		return
-	}
-
-	// Remote: proxy via control plane
 	var body map[string]any
 	if r.Body != nil {
 		defer r.Body.Close()
@@ -41,8 +33,50 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if body == nil {
+		body = map[string]any{}
+	}
 
-	resp, err := CpDoLong("POST", "/agent-chat/"+target, body)
+	message, _ := body["message"].(string)
+	session, _ := body["session"].(string)
+	async, _ := body["async"].(bool)
+	if strings.TrimSpace(message) == "" {
+		WriteJSON(w, 400, map[string]string{"error": "message required"})
+		return
+	}
+	source := r.Header.Get("X-Clutch-Agent")
+	a2aBody := map[string]any{
+		"jsonrpc": "2.0",
+		"id":      "clutch-" + timeNowID(),
+		"method":  "message/send",
+		"params": map[string]any{
+			"message": map[string]any{
+				"kind":      "message",
+				"messageId": "msg_" + timeNowID(),
+				"role":      "user",
+				"parts": []map[string]string{{
+					"kind": "text",
+					"text": message,
+				}},
+				"metadata": map[string]any{
+					"clawmatrix": map[string]any{
+						"session": session,
+						"async":   async,
+					},
+				},
+			},
+			"metadata": map[string]any{
+				"clawmatrix": map[string]any{
+					"session": session,
+					"async":   async,
+				},
+			},
+		},
+	}
+
+	resp, err := CpDoLongWithHeaders("POST", "/a2a/"+target, a2aBody, map[string]string{
+		"X-Clutch-Agent": source,
+	})
 	if err != nil {
 		WriteJSON(w, 502, map[string]string{"error": "control plane unreachable"})
 		return
@@ -70,6 +104,10 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func timeNowID() string {
+	return strings.ReplaceAll(time.Now().UTC().Format("20060102150405.000000000"), ".", "")
 }
 
 func handleConnections(w http.ResponseWriter, r *http.Request) {

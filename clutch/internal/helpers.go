@@ -23,7 +23,15 @@ func CpDoLong(method, path string, body any) (*http.Response, error) {
 	return cpDoWithTokenAndTimeout(method, path, body, CpToken, 5*time.Minute)
 }
 
+func CpDoLongWithHeaders(method, path string, body any, headers map[string]string) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, CpToken, headers, 45*time.Minute)
+}
+
 func cpDoWithTokenAndTimeout(method, path string, body any, token string, timeout time.Duration) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, token, nil, timeout)
+}
+
+func cpDoWithTokenHeadersAndTimeout(method, path string, body any, token string, headers map[string]string, timeout time.Duration) (*http.Response, error) {
 	var r io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -36,6 +44,11 @@ func cpDoWithTokenAndTimeout(method, path string, body any, token string, timeou
 	req.Header.Set("Authorization", "Bearer "+token)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		if v != "" {
+			req.Header.Set(k, v)
+		}
 	}
 	return (&http.Client{Timeout: timeout}).Do(req)
 }

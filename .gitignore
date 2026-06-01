@@ -10,3 +10,5 @@ examples/docker-compose-multi-agent/bin/
 examples/docker-compose-wealthy-multi-agent/
 clutch/clutch
 docs/roadmap-thinking/
+temp-logs/*
+!temp-logs/.gitkeep

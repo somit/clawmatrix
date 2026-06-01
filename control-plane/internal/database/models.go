@@ -52,16 +52,16 @@ type AcmeCache struct {
 }
 
 type Registration struct {
-	ID              uint   `gorm:"primaryKey"`
-	Name            string `gorm:"uniqueIndex;not null"`
-	Description     string `gorm:"type:text;not null;default:''"`
-	TokenHash       string `gorm:"uniqueIndex;not null"`
-	EgressAllowlist string `gorm:"type:text;not null;default:'[]'"` // JSON []string, supports wildcards
-	TTLMinutes      int    `gorm:"not null;default:-1"`
+	ID              uint       `gorm:"primaryKey"`
+	Name            string     `gorm:"uniqueIndex;not null"`
+	Description     string     `gorm:"type:text;not null;default:''"`
+	TokenHash       string     `gorm:"uniqueIndex;not null"`
+	EgressAllowlist string     `gorm:"type:text;not null;default:'[]'"` // JSON []string, supports wildcards
+	TTLMinutes      int        `gorm:"not null;default:-1"`
 	TotalRegistered int        `gorm:"not null;default:0"`
 	Archived        bool       `gorm:"not null;default:false"`
 	MonitorLastSeen *time.Time // last heartbeat from sniffer monitor
-	Labels          string `gorm:"type:text;not null;default:'{}'"` // JSON map[string]string
+	Labels          string     `gorm:"type:text;not null;default:'{}'"` // JSON map[string]string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -105,6 +105,26 @@ type Agent struct {
 	StatsReqCount int64     `gorm:"not null;default:0"`
 	RegisteredAt  time.Time `gorm:"not null"`
 	LastHeartbeat time.Time `gorm:"not null"`
+}
+
+type A2ATask struct {
+	ID              string `gorm:"primaryKey"`
+	Kind            string `gorm:"not null;default:'task'"`
+	ContextID       string `gorm:"index;not null"`
+	RuntimeSession  string
+	RuntimeRunner   string
+	StatusState     string `gorm:"index;not null"`
+	StatusMessage   string `gorm:"type:text;not null;default:'{}'"`
+	StatusTimestamp time.Time
+	History         string `gorm:"type:text;not null;default:'[]'"`
+	Artifacts       string `gorm:"type:text;not null;default:'[]'"`
+	Metadata        string `gorm:"type:text;not null;default:'{}'"`
+	SourceAgentID   string `gorm:"index"`
+	SourceProfile   string `gorm:"index"`
+	TargetAgentID   string `gorm:"index"`
+	TargetProfile   string `gorm:"index"`
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type RequestLog struct {

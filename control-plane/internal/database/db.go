@@ -39,6 +39,7 @@ func Init(driver, uri string) error {
 
 	if err := DB.AutoMigrate(
 		&Registration{}, &Connection{}, &AgentProfile{}, &Agent{},
+		&A2ATask{},
 		&RequestLog{}, &Metric{}, &AuditEvent{}, &CronJob{}, &CronExecution{}, &AcmeCache{},
 		&User{}, &Role{}, &RolePermission{}, &AgentProfileACL{}, &UserIdentity{},
 	); err != nil {

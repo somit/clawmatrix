@@ -26,8 +26,8 @@ func (p *picoclawRunner) ParseOutput(stdout, stderr string) (string, string, map
 	return parsePicoclawOutput(stdout), "", parsePicoclawUsage(stderr)
 }
 
-func (p *picoclawRunner) AgentCmd(_ string) string        { return AgentCmd }
-func (p *picoclawRunner) SessionsPath(_ string) string    { return SessionsPath }
+func (p *picoclawRunner) AgentCmd(_ string) string         { return AgentCmd }
+func (p *picoclawRunner) SessionsPath(_ string) string     { return SessionsPath }
 func (p *picoclawRunner) DiscoverAgents() []agentDiscovery { return nil }
 
 // --- picoclaw output parsing ---
@@ -35,21 +35,41 @@ func (p *picoclawRunner) DiscoverAgents() []agentDiscovery { return nil }
 func parsePicoclawOutput(raw string) string {
 	var lines []string
 	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
-		if strings.Contains(line, "Interactive mode") {
+		line = stripANSI(line)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
 			continue
 		}
-		if strings.TrimSpace(line) == "Goodbye!" {
+		if strings.Contains(trimmed, "Interactive mode") {
+			continue
+		}
+		if trimmed == "Goodbye!" {
+			continue
+		}
+		if strings.Contains(trimmed, "wealthyclaw") && strings.Contains(trimmed, "personal ai") {
+			continue
+		}
+		if strings.Contains(trimmed, "picoclaw") && strings.Contains(trimmed, "Personal AI Assistant") {
+			continue
+		}
+		if strings.Contains(trimmed, `\|/`) {
 			continue
 		}
 		if strings.HasPrefix(line, "🦞 ") {
 			lines = append(lines, line[len("🦞 "):])
-		} else if strings.TrimSpace(line) == "🦞" {
+		} else if trimmed == "🦞" {
 			continue
 		} else {
 			lines = append(lines, line)
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
 }
 
 var picoclawUsageIntKeys = []string{

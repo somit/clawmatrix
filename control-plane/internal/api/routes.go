@@ -25,6 +25,8 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 	// Public
 	mux.HandleFunc("GET /llms.txt", h.LLMsTxt)
 	mux.HandleFunc("GET /health", h.Health)
+	mux.HandleFunc("GET /.well-known/agent-card.json", h.AgentCard)
+	mux.HandleFunc("GET /a2a/{agent}/agent-card.json", h.AgentCard)
 
 	// Auth
 	mux.HandleFunc("POST /auth/login", h.Login)
@@ -95,6 +97,8 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) http.Handler
 	mux.HandleFunc("GET /crons/{id}/executions", h.withAuth(h.ListCronExecutions))
 
 	// Agent-to-Agent
+	mux.HandleFunc("POST /a2a/{agent}", h.A2A)
+	mux.HandleFunc("GET /tasks/{id}", h.GetTask)
 	mux.HandleFunc("POST /agent-chat/{target}", h.withAgent(h.AgentChat))
 	mux.HandleFunc("GET /agent-connections", h.withAgent(h.AgentConnections))
 

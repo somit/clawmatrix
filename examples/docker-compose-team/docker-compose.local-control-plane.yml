@@ -1,37 +1,12 @@
 services:
-  control-plane:
-    build:
-      context: .
-      dockerfile: Dockerfile.control-plane
-    ports:
-      - "8080:8080"
-    environment:
-      - JWT_SECRET=change-me-in-production
-      - DB=sqlite
-      - DB_URI=/data/control-plane.db
-      - LISTEN=:8080
-      - BOOTSTRAP_CONFIG=/etc/control-plane/bootstrap.json
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin
-    volumes:
-      - cp-data:/data
-    healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   ceo:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    depends_on:
-      control-plane:
-        condition: service_healthy
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
-      - CONTROL_PLANE_URL=http://control-plane:8080
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
       - REGISTRATION_TOKEN=rt_ceo_demo_token_789
       - AGENT_ID=ceo-id
       - AGENT_GROUP=ceo
@@ -47,7 +22,9 @@ services:
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
       - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
-      - HOST_URL=http://ceo:8080
+      - HOST_URL=http://127.0.0.1:9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9090:8080"
     volumes:
@@ -57,13 +34,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    depends_on:
-      control-plane:
-        condition: service_healthy
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
-      - CONTROL_PLANE_URL=http://control-plane:8080
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
       - REGISTRATION_TOKEN=rt_marketing_demo_token_123
       - AGENT_ID=marketing-manager-id
       - AGENT_GROUP=marketing-manager
@@ -79,7 +53,9 @@ services:
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
       - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
-      - HOST_URL=http://marketing-manager:8080
+      - HOST_URL=http://127.0.0.1:9091
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9091:8080"
     volumes:
@@ -89,13 +65,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.agent
-    depends_on:
-      control-plane:
-        condition: service_healthy
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
-      - CONTROL_PLANE_URL=http://control-plane:8080
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
       - REGISTRATION_TOKEN=rt_sales_demo_token_456
       - AGENT_ID=sales-manager-id
       - AGENT_GROUP=sales-manager
@@ -111,40 +84,39 @@ services:
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
       - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
       - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
-      - HOST_URL=http://sales-manager:8080
+      - HOST_URL=http://127.0.0.1:9092
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9092:8080"
     volumes:
       - ./agents/sales-manager:/workspace/sales-manager
 
-  # tech-team: clutch proxy + embedded sniffer goroutine
   tech-team:
     build:
       context: .
       dockerfile: Dockerfile.openclaw
-    depends_on:
-      control-plane:
-        condition: service_healthy
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
-      - CONTROL_PLANE_URL=http://control-plane:8080
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
       - REGISTRATION_TOKEN=rt_cto_demo_token_101
       - AGENT_ID=cto-id
       - RUNNER=openclaw
-      - HOST_URL=http://tech-team:8080
+      - HOST_URL=http://127.0.0.1:9093
       - OPENCLAW_CONFIG=/root/.openclaw/openclaw.json
       - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
       - AGENT_TIMEOUT=10m
       - AGENT_GATEWAY_URL=http://localhost:18789
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "9093:8080"
     volumes:
       - ./agents/cto:/workspace/cto
       - ./agents/techlead:/workspace/techlead
 
-  # openclaw gateway: runs in the same network namespace as tech-team (loopback shared)
   tech-team-agent:
     build:
       context: .
@@ -168,6 +140,3 @@ services:
       - ./agents/cto:/workspace/cto
       - ./agents/techlead:/workspace/techlead
     restart: unless-stopped
-
-volumes:
-  cp-data:

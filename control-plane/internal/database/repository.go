@@ -23,12 +23,12 @@ func CreateRegistration(name, description, token string, allowlist []string, lab
 		lb = []byte("{}")
 	}
 	t := &Registration{
-		Name:        name,
-		Description: description,
-		TokenHash:   HashToken(token),
+		Name:            name,
+		Description:     description,
+		TokenHash:       HashToken(token),
 		EgressAllowlist: string(al),
-		Labels:      string(lb),
-		TTLMinutes:  ttlMinutes,
+		Labels:          string(lb),
+		TTLMinutes:      ttlMinutes,
 	}
 	return t, DB.Create(t).Error
 }
@@ -42,7 +42,6 @@ func GetRegistrationByToken(token string) (*Registration, error) {
 	var t Registration
 	return &t, DB.Where("token_hash = ?", HashToken(token)).First(&t).Error
 }
-
 
 func ListRegistrations() ([]Registration, error) {
 	var regs []Registration
@@ -279,6 +278,61 @@ func GetAgentRegistrationName(a *Agent) string {
 		return ""
 	}
 	return *profile.Registration
+}
+
+// --- A2A Tasks ---
+
+func CreateA2ATask(task *A2ATask) error {
+	now := time.Now().UTC()
+	if task.Kind == "" {
+		task.Kind = "task"
+	}
+	if task.StatusTimestamp.IsZero() {
+		task.StatusTimestamp = now
+	}
+	if task.History == "" {
+		task.History = "[]"
+	}
+	if task.Artifacts == "" {
+		task.Artifacts = "[]"
+	}
+	if task.Metadata == "" {
+		task.Metadata = "{}"
+	}
+	task.CreatedAt = now
+	task.UpdatedAt = now
+	return DB.Create(task).Error
+}
+
+func GetA2ATask(id string) (*A2ATask, error) {
+	var task A2ATask
+	return &task, DB.Where("id = ?", id).First(&task).Error
+}
+
+func UpdateA2ATask(id string, updates map[string]any) error {
+	updates["updated_at"] = time.Now().UTC()
+	return DB.Model(&A2ATask{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func MarkInterruptedA2ATasksUnknown() error {
+	now := time.Now().UTC()
+	msg, _ := json.Marshal(map[string]any{
+		"kind":      "message",
+		"role":      "agent",
+		"messageId": "system-restart",
+		"parts": []map[string]string{{
+			"kind": "text",
+			"text": "Control plane restarted before task completion tracking finished.",
+		}},
+	})
+	return DB.Model(&A2ATask{}).
+		Where("status_state IN ?", []string{"submitted", "working"}).
+		Updates(map[string]any{
+			"status_state":     "unknown",
+			"status_message":   string(msg),
+			"status_timestamp": now,
+			"updated_at":       now,
+		}).Error
 }
 
 func GetAgentsForStaleCheck() ([]Agent, error) {

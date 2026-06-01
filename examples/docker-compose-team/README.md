@@ -36,11 +36,13 @@ This means agents cannot bypass egress controls — even Chromium/Playwright whi
 ## Prerequisites
 
 - Docker and Docker Compose
-- An LLM proxy running on the host at `localhost:8081` (used by all agents via `host.docker.internal:8081`)
+- A Cloudflare account ID and Workers AI API token
 
 ## Quick Start
 
 ```bash
+cp .env.example .env
+# edit .env and set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN
 docker compose up --build
 ```
 
@@ -54,9 +56,10 @@ Open the control plane dashboard at `http://localhost:8080`. All agents register
 | `Dockerfile.agent` | Picoclaw agent image (clutch + picoclaw + iptables) |
 | `Dockerfile.openclaw` | Openclaw agent image (clutch + openclaw + iptables) |
 | `Dockerfile.control-plane` | Control plane image |
+| `docker-compose.local-control-plane.yml` | Agent-only stack for a host control-plane running via `air` |
 | `config/bootstrap.json` | Pre-seeds agent registrations with tokens and allowlists |
-| `config/picoclaw.json` | Picoclaw config (model via LLM proxy) |
-| `config/openclaw-tech.json` | Openclaw config for tech-team agents |
+| `config/picoclaw.json` | Picoclaw config (Cloudflare Workers AI via OpenAI-compatible API) |
+| `config/openclaw-tech.json` | Openclaw config for tech-team agents (Cloudflare Workers AI) |
 | `entrypoint.sh` | Starts clutch in proxy or sniffer mode |
 | `agents/ceo/` | CEO workspace |
 | `agents/marketing-manager/` | Marketing Manager workspace |
@@ -82,6 +85,16 @@ Key env vars for openclaw containers:
 | `RUNNER=openclaw` | Tells clutch to use openclaw mode |
 | `HOST_URL=http://tech-team:8080` | Externally-reachable base URL registered with the control plane. Required in Docker because the bind address `0.0.0.0` is not routable by other containers. |
 | `OPENCLAW_CONFIG` | Path to the openclaw config file |
+
+## Local Control Plane Development
+
+When the control-plane is running locally with `air`, use the agent-only compose file:
+
+```bash
+docker compose -f docker-compose.local-control-plane.yml up --build
+```
+
+Your local control-plane must load `examples/docker-compose-team/config/bootstrap.json`, and `HOST_CONTROL_PLANE_URL` can be set in `.env` if the host URL differs from `http://host.docker.internal:9999`.
 
 ## Customization
 

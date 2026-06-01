@@ -80,14 +80,23 @@ func runCLI() {
 		os.Exit(0)
 
 	case "delegate":
-		if len(args) < 3 {
-			fmt.Fprintln(os.Stderr, `usage: clutch [--name <agent>] delegate <agent> "<message>" [session]`)
+		async := false
+		delegateArgs := args[1:]
+		if len(delegateArgs) > 0 && delegateArgs[0] == "--async" {
+			async = true
+			delegateArgs = delegateArgs[1:]
+		}
+		if len(delegateArgs) < 2 {
+			fmt.Fprintln(os.Stderr, `usage: clutch [--name <agent>] delegate [--async] <agent> "<message>" [session]`)
 			os.Exit(1)
 		}
-		target, message := args[1], args[2]
-		payload := map[string]string{"message": message}
-		if len(args) > 3 {
-			payload["session"] = args[3]
+		target, message := delegateArgs[0], delegateArgs[1]
+		payload := map[string]any{"message": message}
+		if async {
+			payload["async"] = true
+		}
+		if len(delegateArgs) > 2 {
+			payload["session"] = delegateArgs[2]
 		}
 		body, _ := json.Marshal(payload)
 		cliPost("/delegate/"+target, string(body))
