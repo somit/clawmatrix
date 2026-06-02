@@ -15,11 +15,15 @@ bin/control-plane   # control plane server (linux/amd64)
 bin/picoclaw        # picoclaw agent runtime (linux/amd64)
 ```
 
-## 2. Set Cloudflare credentials
+The ADK agent image installs Google ADK from PyPI during `docker compose build`.
+
+## 2. Set credentials
 
 ```bash
 cp .env.example .env
 # edit .env and set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN
+# ADK agents use Vertex Gemini via local ADC:
+gcloud auth application-default login
 ```
 
 ## 3. Start the stack
@@ -53,8 +57,8 @@ Set `HOST_CONTROL_PLANE_URL` in `examples/docker-compose-team/.env` if your loca
 | Agent | Port | Runtime | Role |
 |-------|------|---------|------|
 | CEO | 9090 | picoclaw | Strategic decisions, delegates to team |
-| Marketing Manager | 9091 | picoclaw | Marketing strategy and campaigns |
-| Sales Manager | 9092 | picoclaw | Sales pipeline and outreach |
+| Marketing Manager | 9091 | ADK | Marketing strategy and campaigns |
+| Sales Manager | 9092 | ADK | Sales pipeline, outreach, and A2A calls to Marketing |
 | CTO | 9093 | openclaw | Tech strategy, delegates to Tech Lead |
 | Tech Lead | 9093 | openclaw | Technical analysis and research |
 

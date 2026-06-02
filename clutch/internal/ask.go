@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -71,9 +70,10 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 		return
 	}
 
-	runner := newRunner()
-	runner.PrepareSession(agent, session)
-	parts := runner.CommandArgs(agent, msg, session)
+	runner := getRunner()
+	agentView := runnerAgent(agent)
+	runner.PrepareSession(agentView, session)
+	parts := runner.CommandArgs(agentView, msg, session)
 
 	// Serialize per-agent to prevent concurrent session file conflicts.
 	agent.mu.Lock()
@@ -163,21 +163,4 @@ func LocalDelegateAsk(w http.ResponseWriter, r *http.Request, agent *RegisteredA
 	fakeReq.Header.Set("Content-Type", "application/json")
 
 	handleAskForAgent(w, fakeReq, agent)
-}
-
-// --- shared helpers ---
-
-// splitFields splits a command string into args (like strings.Fields).
-func splitFields(s string) []string {
-	return strings.Fields(s)
-}
-
-// envAll returns a copy of os.Environ() (used by runners that need the full env).
-func envAll() []string {
-	return append([]string(nil), os.Environ()...)
-}
-
-// trimSpace trims leading/trailing whitespace.
-func trimSpace(s string) string {
-	return strings.TrimSpace(s)
 }

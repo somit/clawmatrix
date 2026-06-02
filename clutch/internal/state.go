@@ -1,6 +1,7 @@
 package clutch
 
 import (
+	"clutch/internal/runners"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -51,9 +52,10 @@ var (
 	LogAllowed bool
 	LogBlocked bool
 
-	Runner        string
-	WorkspacePath string
-	SessionsPath  string
+	Runner         string
+	RunnerInstance runners.Runner
+	WorkspacePath  string
+	SessionsPath   string
 
 	// Gateway forwarding for openclaw runner
 	AgentGatewayURL   string // e.g. "http://localhost:18789"

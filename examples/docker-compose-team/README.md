@@ -1,21 +1,21 @@
 # Docker Compose Multi-Agent Example
 
-Run 4 AI agents (CEO, Marketing Manager, Sales Manager, Tech Team) with a control plane using a single `docker compose up`. Demonstrates both **picoclaw** and **openclaw** runners side by side, with network egress enforcement via an embedded sniffer.
+Run 4 AI agents (CEO, Marketing Manager, Sales Manager, Tech Team) with a control plane using a single `docker compose up`. Demonstrates **picoclaw**, **Google ADK**, and **openclaw** runners side by side, with network egress enforcement via an embedded sniffer.
 
 ## Architecture
 
 ```
 control-plane (port 8080)
   ├── ceo               (clutch + picoclaw,  port 9090)
-  ├── marketing-manager (clutch + picoclaw,  port 9091)
-  ├── sales-manager     (clutch + picoclaw,  port 9092)
+  ├── marketing-manager (clutch + ADK,       port 9091)
+  ├── sales-manager     (clutch + ADK,       port 9092)
   └── tech-team         (clutch + openclaw,  port 9093)
        ├── tech-team-agent (openclaw gateway, loopback:18789)
        ├── agent: cto
        └── agent: techlead
 ```
 
-Each agent runs as a container with **clutch** as the main process. On chat requests, clutch spawns the configured runner — **picoclaw** (Go, lightweight) or **openclaw** (Node.js, feature-rich) — locally inside the container.
+Each agent runs as a container with **clutch** as the main process. On chat requests, clutch spawns the configured runner — **picoclaw** (Go, lightweight), **ADK** (Python A2A example), or **openclaw** (Node.js, feature-rich) — locally inside the container.
 
 The tech-team container hosts two openclaw agents (CTO + Tech Lead) in a single container, showing clutch's multi-agent mode. A companion `tech-team-agent` container runs the openclaw gateway on the shared loopback interface.
 
@@ -36,13 +36,15 @@ This means agents cannot bypass egress controls — even Chromium/Playwright whi
 ## Prerequisites
 
 - Docker and Docker Compose
-- A Cloudflare account ID and Workers AI API token
+- A Cloudflare account ID and Workers AI API token for picoclaw/openclaw
+- Google application-default credentials for ADK Vertex Gemini (`gcloud auth application-default login`)
 
 ## Quick Start
 
 ```bash
 cp .env.example .env
 # edit .env and set CLOUDFLARE_ACCOUNT_ID + CLOUDFLARE_API_TOKEN
+# optionally override GOOGLE_CLOUD_PROJECT / ADK_MODEL for ADK agents
 docker compose up --build
 ```
 
@@ -54,6 +56,7 @@ Open the control plane dashboard at `http://localhost:8080`. All agents register
 |------|---------|
 | `docker-compose.yml` | Full stack: control-plane + 4 agent containers + openclaw gateway |
 | `Dockerfile.agent` | Picoclaw agent image (clutch + picoclaw + iptables) |
+| `Dockerfile.adk` | Google ADK sales agent image (clutch + Python ADK + iptables) |
 | `Dockerfile.openclaw` | Openclaw agent image (clutch + openclaw + iptables) |
 | `Dockerfile.control-plane` | Control plane image |
 | `docker-compose.local-control-plane.yml` | Agent-only stack for a host control-plane running via `air` |
@@ -64,15 +67,20 @@ Open the control plane dashboard at `http://localhost:8080`. All agents register
 | `agents/ceo/` | CEO workspace |
 | `agents/marketing-manager/` | Marketing Manager workspace |
 | `agents/sales-manager/` | Sales Manager workspace |
+| `adk-agent/` | Shared ADK CLI adapter used by ADK-backed agents |
 | `agents/cto/` | CTO workspace (openclaw) |
 | `agents/techlead/` | Tech Lead workspace (openclaw) |
 | `bin/` | Pre-built linux/amd64 binaries (no Go required) |
 
 ## Runners
 
-### picoclaw (ceo, marketing-manager, sales-manager)
+### picoclaw (ceo)
 
 Set `RUNNER=picoclaw` and `AGENT_CMD=picoclaw agent`. Session keys are automatically prefixed with `agent:main:` to match picoclaw's routing.
+
+### ADK (marketing-manager, sales-manager)
+
+Marketing Manager and Sales Manager use `Dockerfile.adk` and `RUNNER=google-adk`. Clutch defaults that runner to `adk run`, passing the message, session id, and `SESSION_URI` to ADK CLI. The runner loads the ADK agent from `$WORKSPACE_PATH/adk`, so each agent's `root_agent` lives in `agents/<name>/adk/agent.py`. ClawMatrix discovery and delegation are exposed as ADK tools in `/opt/adk-agent/clawmatrix_tools.py`.
 
 ### openclaw (tech-team)
 

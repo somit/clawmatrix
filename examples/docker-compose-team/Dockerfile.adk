@@ -1,0 +1,17 @@
+FROM python:3.12-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates iptables && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir "google-adk[a2a,extensions]>=1.27.0"
+
+COPY bin/clutch /usr/local/bin/clutch
+COPY adk-agent /opt/adk-agent
+COPY entrypoint.sh /entrypoint.sh
+
+RUN chmod +x /usr/local/bin/clutch /entrypoint.sh
+
+EXPOSE 8080
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["--listen", "0.0.0.0:8080"]

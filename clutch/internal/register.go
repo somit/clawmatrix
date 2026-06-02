@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"clutch/internal/runners"
 )
 
 // GatewayVersion is set by main before calling Register.
@@ -24,11 +26,11 @@ func Register() {
 		Target string `json:"target"`
 	}
 
-	runner := newRunner()
+	runner := getRunner()
 
 	var agentsList []agentReq
 	var connections []connReq
-	discoveredMap := map[string]*agentDiscovery{}
+	discoveredMap := map[string]*runners.Discovery{}
 
 	if PreferredAgentID != "" {
 		if discovered := runner.DiscoverAgents(); len(discovered) > 0 {
@@ -72,7 +74,7 @@ func Register() {
 				meta[kv[1]] = v
 			}
 		}
-		if _, ok := meta["chatUrl"]; !ok && AgentCmd != "" {
+		if _, ok := meta["chatUrl"]; !ok && runner.AgentCmd(PreferredAgentID) != "" {
 			meta["chatUrl"] = HostBaseURL + "/ask/" + PreferredAgentID
 		}
 		if _, ok := meta["workspaceUrl"]; !ok && WorkspacePath != "" {
@@ -81,7 +83,7 @@ func Register() {
 		if _, ok := meta["sessionsUrl"]; !ok && SessionsPath != "" {
 			meta["sessionsUrl"] = HostBaseURL + "/sessions/" + PreferredAgentID
 		}
-		dc := agentDiscovery{ID: PreferredAgentID, Group: PreferredAgentGroup, Default: true, Workspace: WorkspacePath}
+		dc := runners.Discovery{ID: PreferredAgentID, Group: PreferredAgentGroup, Default: true, Workspace: WorkspacePath}
 		discoveredMap[PreferredAgentID] = &dc
 		agentsList = []agentReq{{ID: PreferredAgentID, AgentGroup: PreferredAgentGroup, Meta: meta}}
 	}

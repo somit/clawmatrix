@@ -1,6 +1,7 @@
 package clutch
 
 import (
+	"clutch/internal/runners"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -215,22 +216,28 @@ func serveWorkspaceLocks(w http.ResponseWriter, r *http.Request, wsPath string) 
 // --- Sessions Browser ---
 
 func handleSessionsForAgent(w http.ResponseWriter, r *http.Request, agent *RegisteredAgent) {
-	if agent.sessionsPath == "" {
-		WriteJSON(w, 404, map[string]string{"error": "sessions not configured"})
-		return
-	}
-	serveSessions(w, r, agent.sessionsPath)
+	serveSessions(w, r, runnerAgent(agent))
 }
 
 func handleSessions(w http.ResponseWriter, r *http.Request) {
-	if SessionsPath == "" {
+	serveSessions(w, r, runners.Agent{ID: PreferredAgentID, SessionsPath: SessionsPath})
+}
+
+func serveSessions(w http.ResponseWriter, r *http.Request, agent runners.Agent) {
+	runner := getRunner()
+	sessPath := agent.SessionsPath
+	if sessPath == "" && agent.ID != "" {
+		sessPath = runner.SessionsPath(agent.ID)
+		agent.SessionsPath = sessPath
+	}
+	if sessPath == "" {
 		WriteJSON(w, 404, map[string]string{"error": "sessions not configured"})
 		return
 	}
-	serveSessions(w, r, SessionsPath)
-}
+	if runner.ServeSessions(w, r, agent) {
+		return
+	}
 
-func serveSessions(w http.ResponseWriter, r *http.Request, sessPath string) {
 	name := r.URL.Query().Get("name")
 
 	if name == "" {

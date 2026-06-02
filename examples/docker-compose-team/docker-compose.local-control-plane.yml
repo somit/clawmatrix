@@ -14,7 +14,7 @@ services:
       - RUNNER=picoclaw
       - WEALTHYCLAW_CONFIG=/root/.picoclaw/config.json
       - WORKSPACE_PATH=/workspace/ceo
-      - SESSIONS_PATH=/workspace/ceo/sessions
+      - SESSION_URI=/workspace/ceo/sessions
       - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/ceo
       - PICOCLAW_AGENTS_DEFAULTS_MODEL=cloudflare-mistral-small-3.1-24b
       - WEALTHYCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/ceo
@@ -33,7 +33,7 @@ services:
   marketing-manager:
     build:
       context: .
-      dockerfile: Dockerfile.agent
+      dockerfile: Dockerfile.adk
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
@@ -41,30 +41,27 @@ services:
       - REGISTRATION_TOKEN=rt_marketing_demo_token_123
       - AGENT_ID=marketing-manager-id
       - AGENT_GROUP=marketing-manager
-      - AGENT_CMD=picoclaw agent
-      - RUNNER=picoclaw
-      - WEALTHYCLAW_CONFIG=/root/.picoclaw/config.json
+      - RUNNER=google-adk
+      - AGENT_TIMEOUT=10m
       - WORKSPACE_PATH=/workspace/marketing-manager
-      - SESSIONS_PATH=/workspace/marketing-manager/sessions
-      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/marketing-manager
-      - PICOCLAW_AGENTS_DEFAULTS_MODEL=cloudflare-mistral-small-3.1-24b
-      - WEALTHYCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/marketing-manager
-      - WEALTHYCLAW_AGENTS_DEFAULTS_MODEL_NAME=cloudflare-mistral-small-3.1-24b
-      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
-      - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+      - SESSION_URI=sqlite:////workspace/marketing-manager/sessions/adk_sessions.db
+      - GOOGLE_GENAI_USE_VERTEXAI=true
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-wealthy-prod-app-669}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
+      - ADK_MODEL=${ADK_MODEL:-@google/global/gemini-3-flash-preview}
       - HOST_URL=http://127.0.0.1:9091
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "9091:8080"
     volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
       - ./agents/marketing-manager:/workspace/marketing-manager
 
   sales-manager:
     build:
       context: .
-      dockerfile: Dockerfile.agent
+      dockerfile: Dockerfile.adk
     cap_add: [NET_RAW, NET_ADMIN]
     user: root
     environment:
@@ -72,24 +69,21 @@ services:
       - REGISTRATION_TOKEN=rt_sales_demo_token_456
       - AGENT_ID=sales-manager-id
       - AGENT_GROUP=sales-manager
-      - AGENT_CMD=picoclaw agent
-      - RUNNER=picoclaw
-      - WEALTHYCLAW_CONFIG=/root/.picoclaw/config.json
+      - RUNNER=google-adk
+      - AGENT_TIMEOUT=10m
       - WORKSPACE_PATH=/workspace/sales-manager
-      - SESSIONS_PATH=/workspace/sales-manager/sessions
-      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/sales-manager
-      - PICOCLAW_AGENTS_DEFAULTS_MODEL=cloudflare-mistral-small-3.1-24b
-      - WEALTHYCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/sales-manager
-      - WEALTHYCLAW_AGENTS_DEFAULTS_MODEL_NAME=cloudflare-mistral-small-3.1-24b
-      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
-      - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
-      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+      - SESSION_URI=sqlite:////workspace/sales-manager/sessions/adk_sessions.db
+      - GOOGLE_GENAI_USE_VERTEXAI=true
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-wealthy-prod-app-669}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
+      - ADK_MODEL=${ADK_MODEL:-@google/global/gemini-3-flash-preview}
       - HOST_URL=http://127.0.0.1:9092
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
       - "9092:8080"
     volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
       - ./agents/sales-manager:/workspace/sales-manager
 
   tech-team:
@@ -114,6 +108,8 @@ services:
     ports:
       - "9093:8080"
     volumes:
+      - ./agents/cto/sessions:/root/.openclaw/agents/cto-id/sessions
+      - ./agents/techlead/sessions:/root/.openclaw/agents/techlead-id/sessions
       - ./agents/cto:/workspace/cto
       - ./agents/techlead:/workspace/techlead
 
@@ -137,6 +133,8 @@ services:
       - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
     command: ["openclaw", "gateway", "run"]
     volumes:
+      - ./agents/cto/sessions:/root/.openclaw/agents/cto-id/sessions
+      - ./agents/techlead/sessions:/root/.openclaw/agents/techlead-id/sessions
       - ./agents/cto:/workspace/cto
       - ./agents/techlead:/workspace/techlead
     restart: unless-stopped

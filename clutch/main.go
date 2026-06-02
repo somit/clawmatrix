@@ -144,7 +144,7 @@ func main() {
 	agentTimeoutFlag := flag.Duration("agent-timeout", 120*time.Second, "timeout for agent subprocess (or AGENT_TIMEOUT env)")
 	runnerFlag := flag.String("runner", "", "runner type, e.g. 'picoclaw' or 'openclaw' (or RUNNER env)")
 	workspaceFlag := flag.String("workspace", "", "workspace directory for /workspace endpoint (or WORKSPACE_PATH env)")
-	sessionsFlag := flag.String("sessions", "", "sessions directory for /sessions endpoint (or SESSIONS_PATH env)")
+	sessionURIFlag := flag.String("session-uri", "", "session store URI/path for /sessions endpoint (or SESSION_URI env)")
 	agentGatewayFlag := flag.String("agent-gateway", "", "agent gateway URL for openclaw HTTP forwarding (or AGENT_GATEWAY_URL env)")
 	agentGatewayTokenFlag := flag.String("agent-gateway-token", "", "bearer token for agent gateway auth (or AGENT_GATEWAY_TOKEN env)")
 	noSnifferFlag := flag.Bool("no-sniffer", false, "disable sniffer goroutine (or DISABLE_SNIFFER env)")
@@ -185,9 +185,9 @@ func main() {
 	if clutch.WorkspacePath == "" {
 		clutch.WorkspacePath = os.Getenv("WORKSPACE_PATH")
 	}
-	clutch.SessionsPath = *sessionsFlag
+	clutch.SessionsPath = *sessionURIFlag
 	if clutch.SessionsPath == "" {
-		clutch.SessionsPath = os.Getenv("SESSIONS_PATH")
+		clutch.SessionsPath = os.Getenv("SESSION_URI")
 	}
 	clutch.AgentGatewayURL = *agentGatewayFlag
 	if clutch.AgentGatewayURL == "" {
@@ -201,6 +201,7 @@ func main() {
 	if !clutch.SnifferDisabled {
 		clutch.SnifferDisabled = os.Getenv("DISABLE_SNIFFER") == "true"
 	}
+	clutch.InitRunner()
 
 	clutch.ListenAddr = *listen
 	clutch.HostBaseURL = os.Getenv("HOST_URL")
