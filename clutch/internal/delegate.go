@@ -46,19 +46,23 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	source := r.Header.Get("X-Clutch-Agent")
+
 	// Same-registration routing: if the target is an agent served by this clutch
 	// instance, run it directly instead of round-tripping through the control
 	// plane. Async delegations still go through the control plane so the caller
-	// gets a trackable A2A task.
+	// gets a trackable A2A task. The runtime session is namespaced the same way
+	// the control plane names delegations — delegate:<source>:<session> — so
+	// same-clutch and CP-routed hand-offs stay consistent.
 	if !async {
 		if agent := findLocalAgent(target); agent != nil {
-			log.Printf("local delegation to %s (same-registration)", target)
-			LocalDelegateAsk(w, r, agent)
+			localSession := delegateSessionName(source, session)
+			log.Printf("local delegation to %s (same-registration), session=%s", target, localSession)
+			LocalDelegateAsk(w, agent, message, localSession)
 			return
 		}
 	}
 
-	source := r.Header.Get("X-Clutch-Agent")
 	a2aBody := map[string]any{
 		"jsonrpc": "2.0",
 		"id":      "clutch-" + timeNowID(),
@@ -118,6 +122,19 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+// delegateSessionName namespaces a local (same-clutch) delegation session as
+// delegate:<source>:<hint>, matching how the control plane names agent→agent
+// hand-offs so session ids are consistent regardless of routing.
+func delegateSessionName(source, hint string) string {
+	if hint == "" {
+		hint = "default"
+	}
+	if source == "" {
+		return "delegate:" + hint
+	}
+	return "delegate:" + source + ":" + hint
 }
 
 func timeNowID() string {

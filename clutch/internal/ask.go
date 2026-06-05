@@ -142,23 +142,16 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 }
 
 // LocalDelegateAsk runs a local agent's command for same-instance delegation.
-func LocalDelegateAsk(w http.ResponseWriter, r *http.Request, agent *RegisteredAgent) {
-	var req AskRequest
-	if r.Body != nil {
-		defer r.Body.Close()
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			WriteJSON(w, 400, map[string]string{"error": "invalid JSON"})
-			return
-		}
-	}
-
-	msg := strings.TrimSpace(req.Message)
+// The message/session are passed in already-parsed — handleDelegate has consumed
+// the request body, so re-reading it here would fail.
+func LocalDelegateAsk(w http.ResponseWriter, agent *RegisteredAgent, message, session string) {
+	msg := strings.TrimSpace(message)
 	if msg == "" {
 		WriteJSON(w, 400, map[string]string{"error": "message required"})
 		return
 	}
 
-	fakeBody, _ := json.Marshal(req)
+	fakeBody, _ := json.Marshal(AskRequest{Message: message, Session: session})
 	fakeReq, _ := http.NewRequest("POST", "/ask/"+agent.id, bytes.NewReader(fakeBody))
 	fakeReq.Header.Set("Content-Type", "application/json")
 

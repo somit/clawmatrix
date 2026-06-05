@@ -233,7 +233,7 @@ func (h *Handlers) a2aMessageSend(w http.ResponseWriter, r *http.Request, req a2
 	if contextID == "" {
 		contextID = "ctx_" + randomID(12)
 	}
-	runtimeSession := runtimeSessionName(source, sessionHint, contextID)
+	runtimeSession := runtimeSessionName(sessionPrefix(authCtx.kind), source, sessionHint, contextID)
 	taskID := "task_" + randomID(12)
 	now := time.Now().UTC()
 	targetRunner, _ := targetMeta["runner"].(string)
@@ -666,14 +666,27 @@ func statusMessage(text string) a2aMessage {
 	}
 }
 
-func runtimeSessionName(source, hint, contextID string) string {
+// runtimeSessionName builds the runtime session id for a message. The prefix
+// reflects who is asking: "delegate" only for agent→agent hand-offs; "ask" for a
+// human/CLI (user) calling an agent directly.
+func runtimeSessionName(prefix, source, hint, contextID string) string {
 	if hint == "" {
 		hint = contextID
 	}
 	if source == "" {
 		return "a2a:" + hint
 	}
-	return "delegate:" + source + ":" + hint
+	return prefix + ":" + source + ":" + hint
+}
+
+// sessionPrefix picks the session-name prefix from the caller kind. A user (PAT/
+// JWT, e.g. via wealer or the UI) asking an agent is an "ask"; an agent or its
+// clutch registration reaching another agent is a "delegate".
+func sessionPrefix(kind string) string {
+	if kind == "user" {
+		return "ask"
+	}
+	return "delegate"
 }
 
 func mapStringAny(v any) map[string]any {
