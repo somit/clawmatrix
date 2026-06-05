@@ -343,3 +343,58 @@ func requeueLogs(batch []map[string]any) {
 	}
 	LogBufMu.Unlock()
 }
+
+// --- Local delegation activity (trace) ---
+
+// ActivityFlushLoop periodically reports buffered local-delegation hops to the
+// control plane so they appear in the activity/trace view.
+func ActivityFlushLoop() {
+	tick := time.NewTicker(5 * time.Second)
+	for range tick.C {
+		flushActivity()
+	}
+}
+
+func bufferActivity(entry map[string]any) {
+	ActivityBufMu.Lock()
+	ActivityBuf = append(ActivityBuf, entry)
+	n := len(ActivityBuf)
+	ActivityBufMu.Unlock()
+
+	if n >= 25 {
+		go flushActivity()
+	}
+}
+
+func flushActivity() {
+	ActivityBufMu.Lock()
+	if len(ActivityBuf) == 0 {
+		ActivityBufMu.Unlock()
+		return
+	}
+	batch := ActivityBuf
+	ActivityBuf = nil
+	ActivityBufMu.Unlock()
+
+	resp, err := CpDo("POST", "/agent-activity", map[string]any{"entries": batch})
+	if err != nil {
+		log.Printf("activity flush: %v (%d entries re-queued)", err, len(batch))
+		requeueActivity(batch)
+		return
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("activity flush: %s %s (%d entries re-queued)", resp.Status, b, len(batch))
+		requeueActivity(batch)
+	}
+}
+
+func requeueActivity(batch []map[string]any) {
+	ActivityBufMu.Lock()
+	ActivityBuf = append(batch, ActivityBuf...)
+	if len(ActivityBuf) > maxLogBuf {
+		ActivityBuf = ActivityBuf[len(ActivityBuf)-maxLogBuf:]
+	}
+	ActivityBufMu.Unlock()
+}

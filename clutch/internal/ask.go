@@ -15,6 +15,7 @@ type AskRequest struct {
 	Message string `json:"message"`
 	Session string `json:"session"`
 	Timeout int    `json:"timeout"`
+	TaskID  string `json:"taskId"` // CP task this run serves; used to link delegations
 }
 
 type AskResponse struct {
@@ -53,6 +54,13 @@ func handleAskForAgent(w http.ResponseWriter, r *http.Request, agent *Registered
 	session := req.Session
 	if session == "" {
 		session = "cli:default"
+	}
+
+	// Stash the task this agent is serving so any delegation it makes mid-run can
+	// be linked back as a child. Cleared when the run returns.
+	if req.TaskID != "" {
+		agentServingTask.Store(agent.id, req.TaskID)
+		defer agentServingTask.Delete(agent.id)
 	}
 
 	timeout := AgentTimeout

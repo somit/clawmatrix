@@ -67,6 +67,16 @@ var (
 	LogBuf   []map[string]any
 	LogBufMu sync.Mutex
 
+	// ActivityBuf batches local (same-clutch) delegation hops reported to the
+	// control plane so they appear in the trace/activity view.
+	ActivityBuf   []map[string]any
+	ActivityBufMu sync.Mutex
+
+	// agentServingTask maps an agent's local id → the CP task id it is currently
+	// serving, so a delegation made mid-run links back to its parent task.
+	// Reliable because clutch serializes one ask per agent.
+	agentServingTask sync.Map
+
 	// Multi-agent state
 	RegisteredAgents   []RegisteredAgent
 	RegisteredAgentsMu sync.RWMutex

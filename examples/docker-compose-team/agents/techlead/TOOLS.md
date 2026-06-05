@@ -16,21 +16,30 @@ clutch --name techlead connections
 
 Returns a list of agents you can reach directly.
 
-### Delegate work to an agent
+### Delegate work to an agent (always async)
+
+**Always delegate with `--async`.** It returns immediately with a task id and `status: "submitted"` instead of blocking until the other agent finishes — so a slow downstream task can't stall you or time out.
 
 ```bash
-clutch --name techlead delegate <agent-name> "<your task>" "<session-id>"
+clutch --name techlead delegate --async <agent-name> "<your task>" "<session-id>"
 ```
-
-**The response is synchronous** — the agent's full reply comes back directly in stdout.
 
 Example:
 
 ```bash
-clutch --name techlead delegate zoomer "Build a React component for displaying API latency as a chart" "latency-chart-task"
+clutch --name techlead delegate --async zoomer "Build a React component for displaying API latency as a chart" "latency-chart-task"
 ```
 
 The session ID is optional but recommended for traceability.
+
+### Poll for the result
+
+The async delegate returns JSON with a task `id`. Poll it until `state` is `completed` (or `failed`/`canceled`); the final reply is in the task's message history.
+
+```bash
+clutch --name techlead tasks <task-id>   # one task's current state + result
+clutch --name techlead tasks             # list your recent tasks
+```
 
 ## Scheduled Tasks (Crons)
 

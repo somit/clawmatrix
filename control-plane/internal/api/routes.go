@@ -129,7 +129,11 @@ func NewRouter(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig, store storag
 
 	// Agent-to-Agent
 	mux.HandleFunc("POST /a2a/{agent}", h.A2A)
+	mux.HandleFunc("GET /tasks", h.ListTasks) // auth handled inside (user/PAT or agent/registration)
 	mux.HandleFunc("GET /tasks/{id}", h.GetTask)
+	mux.HandleFunc("GET /tasks/{id}/trace", h.GetTaskTrace)
+	mux.HandleFunc("GET /tasks/{id}/thread", h.GetTaskThread)
+	mux.HandleFunc("POST /agent-activity", h.withAgent(h.IngestAgentActivity)) // clutch reports local hops
 	mux.HandleFunc("POST /agent-chat/{target}", h.withAgent(h.AgentChat))
 	mux.HandleFunc("GET /agent-connections", h.withAgent(h.AgentConnections))
 

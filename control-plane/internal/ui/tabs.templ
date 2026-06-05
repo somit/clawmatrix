@@ -135,6 +135,30 @@ templ CronsTab() {
 	</section>
 }
 
+// ActivityTab shows recent asks (who called which agent) for audit/observability.
+templ ActivityTab() {
+	<section id="activity-tab">
+		<div class="section-header">
+			<h2>Activity</h2>
+			<div class="filter-bar">
+				<input id="activity-caller-filter" placeholder="Caller…" style="width:140px" onkeydown="if(event.key==='Enter')loadActivity()"/>
+				<input id="activity-target-filter" placeholder="Agent…" style="width:140px" onkeydown="if(event.key==='Enter')loadActivity()"/>
+				<select id="activity-state-filter" onchange="loadActivity()">
+					<option value="">All states</option>
+					<option value="submitted">Submitted</option>
+					<option value="working">Working</option>
+					<option value="completed">Completed</option>
+					<option value="failed">Failed</option>
+					<option value="canceled">Canceled</option>
+				</select>
+				<button class="btn btn-sm" onclick="loadActivity()">Refresh</button>
+			</div>
+		</div>
+		<p class="muted" style="margin:0 0 12px">Every ask through the control plane — who called, which agent, and the outcome. Admins see all; others see their own.</p>
+		<div id="activity-list"></div>
+	</section>
+}
+
 templ EventsTab() {
 	<section id="events-tab">
 		<div class="section-header">

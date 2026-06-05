@@ -68,7 +68,7 @@ func Nav() templ.Component {
 			templ_7745c5c3_Var2 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav class=\"sidebar\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('uploads', this)\">Attachments</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('events', this)\">Events</button><div class=\"sidebar-divider\"></div><button onclick=\"showTab('humans', this)\">Humans</button> <button onclick=\"showTab('teams', this)\">Teams</button> <button onclick=\"showTab('roles', this)\">Roles</button> <button onclick=\"showTab('tokens', this)\">Access Tokens</button></nav>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<nav class=\"sidebar\"><button class=\"active\" onclick=\"showTab('dashboard', this)\">Dashboard</button> <button onclick=\"showTab('agents', this)\">Agents</button> <button onclick=\"showTab('registrations', this)\">Registrations</button> <button onclick=\"showTab('templates', this)\">Profiles</button> <button onclick=\"showTab('connections', this)\">Connections</button> <button onclick=\"showTab('uploads', this)\">Attachments</button> <button onclick=\"showTab('logs', this)\">Network Logs</button> <button onclick=\"showTab('crons', this)\">Crons</button> <button onclick=\"showTab('activity', this)\">Activity</button> <button onclick=\"showTab('events', this)\">Events</button><div class=\"sidebar-divider\"></div><button onclick=\"showTab('humans', this)\">Humans</button> <button onclick=\"showTab('teams', this)\">Teams</button> <button onclick=\"showTab('roles', this)\">Roles</button> <button onclick=\"showTab('tokens', this)\">Access Tokens</button></nav>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -127,6 +127,10 @@ func Main() templ.Component {
 			return templ_7745c5c3_Err
 		}
 		templ_7745c5c3_Err = CronsTab().Render(ctx, templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = ActivityTab().Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

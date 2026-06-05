@@ -18,6 +18,12 @@ func CpDoWithToken(method, path string, body any, token string) (*http.Response,
 	return cpDoWithTokenAndTimeout(method, path, body, token, 10*time.Second)
 }
 
+// CpDoWithHeaders is like CpDo but lets the caller pass extra request headers
+// (e.g. X-Clutch-Agent) using the registration token and the default timeout.
+func CpDoWithHeaders(method, path string, body any, headers map[string]string) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, CpToken, headers, 10*time.Second)
+}
+
 // CpDoLong is like CpDo but with a long timeout for agent chat/delegate calls.
 func CpDoLong(method, path string, body any) (*http.Response, error) {
 	return cpDoWithTokenAndTimeout(method, path, body, CpToken, 5*time.Minute)

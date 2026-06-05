@@ -310,6 +310,7 @@ function showTab(name, btn) {
   if (name === 'roles') loadRoles();
   if (name === 'tokens') loadTokens();
   if (name === 'uploads') loadUploads();
+  if (name === 'activity') loadActivity();
 }
 
 function initTabFromHash() {
@@ -478,4 +479,5 @@ function refresh() {
   if (active && active.id === 'roles-tab') loadRoles();
   if (active && active.id === 'tokens-tab') loadTokens();
   if (active && active.id === 'uploads-tab') loadUploads();
+  if (active && active.id === 'activity-tab') loadActivity();
 }

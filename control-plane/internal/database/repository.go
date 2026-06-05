@@ -347,6 +347,65 @@ func GetAgentsForStaleCheck() ([]Agent, error) {
 	return agents, DB.Where("status IN ?", []string{"healthy", "stale"}).Find(&agents).Error
 }
 
+// A2ATaskFilter narrows a task listing for the activity/audit view.
+type A2ATaskFilter struct {
+	CallerUserID  uint   // 0 = any
+	CallerName    string // exact caller (username/profile)
+	TargetProfile string
+	State         string
+	ParentTaskID  string // direct children of a task
+	Session       string // exact runtime session (a thread)
+	Limit         int
+	// InvolvesProfile / InvolvesAgentID scope to tasks an agent is party to
+	// (source OR target OR caller) — used when an agent lists its own tasks.
+	InvolvesProfile string
+	InvolvesAgentID string
+}
+
+// ListA2ATasks returns asks newest-first, optionally filtered. Used by the
+// activity view to see who called which agent.
+func ListA2ATasks(f A2ATaskFilter) ([]A2ATask, error) {
+	q := DB.Model(&A2ATask{})
+	if f.CallerUserID != 0 {
+		q = q.Where("caller_user_id = ?", f.CallerUserID)
+	}
+	if f.CallerName != "" {
+		q = q.Where("caller_name = ?", f.CallerName)
+	}
+	if f.TargetProfile != "" {
+		q = q.Where("target_profile = ?", f.TargetProfile)
+	}
+	if f.State != "" {
+		q = q.Where("status_state = ?", f.State)
+	}
+	if f.ParentTaskID != "" {
+		q = q.Where("parent_task_id = ?", f.ParentTaskID)
+	}
+	if f.Session != "" {
+		q = q.Where("runtime_session = ?", f.Session)
+	}
+	if f.InvolvesProfile != "" || f.InvolvesAgentID != "" {
+		or := DB
+		if f.InvolvesProfile != "" {
+			or = or.Where("source_profile = ?", f.InvolvesProfile).
+				Or("target_profile = ?", f.InvolvesProfile).
+				Or("caller_name = ?", f.InvolvesProfile)
+		}
+		if f.InvolvesAgentID != "" {
+			or = or.Or("source_agent_id = ?", f.InvolvesAgentID).
+				Or("target_agent_id = ?", f.InvolvesAgentID)
+		}
+		q = q.Where(or)
+	}
+	limit := f.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	var tasks []A2ATask
+	err := q.Order("created_at desc").Limit(limit).Find(&tasks).Error
+	return tasks, err
+}
+
 // --- Request Logs ---
 
 type LogDomainStat struct {

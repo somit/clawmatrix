@@ -102,6 +102,16 @@ func runCLI() {
 		cliPost("/delegate/"+target, string(body))
 		os.Exit(0)
 
+	case "tasks", "poll":
+		// Poll an async delegation: `clutch tasks <id>` shows one task,
+		// `clutch tasks` lists this agent's recent tasks.
+		if len(args) >= 2 && args[1] != "" {
+			cliGet("/tasks/" + args[1])
+		} else {
+			cliGet("/tasks")
+		}
+		os.Exit(0)
+
 	case "crons":
 		if len(args) < 2 {
 			cliGet("/crons")
@@ -244,6 +254,7 @@ func main() {
 		go clutch.HeartbeatLoop()
 		go clutch.ConfigPollLoop()
 		go clutch.LogFlushLoop()
+		go clutch.ActivityFlushLoop()
 	}
 
 	// Start sniffer goroutine (Linux only, skipped if disabled or no caps)

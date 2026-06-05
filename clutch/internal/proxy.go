@@ -143,6 +143,10 @@ func Handle(w http.ResponseWriter, r *http.Request) {
 			handleDelegate(w, r)
 			return
 		}
+		if strings.HasPrefix(r.URL.Path, "/tasks") && r.Method == http.MethodGet {
+			handleTaskStatus(w, r)
+			return
+		}
 		if r.URL.Path == "/connections" && r.Method == http.MethodGet {
 			handleConnections(w, r)
 			return

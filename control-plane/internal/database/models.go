@@ -196,8 +196,16 @@ type A2ATask struct {
 	SourceProfile   string `gorm:"index"`
 	TargetAgentID   string `gorm:"index"`
 	TargetProfile   string `gorm:"index"`
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
+	// Caller attribution — who initiated this ask (distinct from SourceProfile,
+	// which overloads the agent-profile namespace). Set for every ask.
+	CallerKind   string `gorm:"index"` // user | agent | registration
+	CallerUserID uint   `gorm:"index"` // User.ID for user/PAT asks; 0 otherwise
+	CallerName   string `gorm:"index"` // username, profile, or registration name (display)
+	// ParentTaskID links this hop to the ask that triggered it (agent→agent
+	// delegation). Empty = a root ask. Captured at delegation time by clutch.
+	ParentTaskID string `gorm:"index"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type RequestLog struct {

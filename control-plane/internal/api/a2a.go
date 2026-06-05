@@ -10,6 +10,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -187,6 +189,269 @@ func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, taskToA2A(task))
 }
 
+// ListTasks returns asks (newest first) for the activity/audit view, so you can
+// see who called which agent. Admins see all (and may filter by ?userId / ?caller);
+// non-admins see only their own asks.
+func (h *Handlers) ListTasks(w http.ResponseWriter, r *http.Request) {
+	authCtx, errResp := h.a2aAuth(r)
+	if errResp != nil {
+		respond(w, 401, J{"error": errResp.Message})
+		return
+	}
+	q := r.URL.Query()
+	f := database.A2ATaskFilter{
+		CallerName:    q.Get("caller"),
+		TargetProfile: q.Get("target"),
+		State:         q.Get("state"),
+	}
+	if v := q.Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			f.Limit = n
+		}
+	}
+	switch authCtx.kind {
+	case "user":
+		if isAdmin(authCtx.user) {
+			if v := q.Get("userId"); v != "" {
+				if n, err := strconv.ParseUint(v, 10, 64); err == nil {
+					f.CallerUserID = uint(n)
+				}
+			}
+		} else {
+			f.CallerUserID = authCtx.user.ID // non-admins only see their own
+		}
+	default: // agent / registration → only tasks they're party to
+		f.InvolvesProfile = authCtx.sourceProfile
+		if authCtx.agent != nil {
+			f.InvolvesAgentID = authCtx.agent.ID
+		}
+	}
+	tasks, _ := database.ListA2ATasks(f)
+	out := make([]J, 0, len(tasks))
+	for i := range tasks {
+		out = append(out, taskNodeJSON(&tasks[i]))
+	}
+	respond(w, 200, out)
+}
+
+// taskNodeJSON is the compact shape used by the activity list and trace tree.
+func taskNodeJSON(t *database.A2ATask) J {
+	// Legacy rows (before caller columns) carry the caller in SourceProfile.
+	caller := t.CallerName
+	if caller == "" {
+		caller = t.SourceProfile
+	}
+	return J{
+		"id":            t.ID,
+		"parentTaskId":  t.ParentTaskID,
+		"contextId":     t.ContextID,
+		"callerKind":    t.CallerKind,
+		"callerName":    caller,
+		"callerUserId":  t.CallerUserID,
+		"target":        t.TargetProfile,
+		"targetAgentId": t.TargetAgentID,
+		"state":         t.StatusState,
+		"runner":        t.RuntimeRunner,
+		"session":       t.RuntimeSession,
+		"prompt":        truncate(taskPromptPreview(t.History), 200),
+		"createdAt":     t.CreatedAt,
+		"updatedAt":     t.UpdatedAt,
+	}
+}
+
+// GetTaskTrace returns every hop in the same chain as the given task — it walks
+// up to the root via ParentTaskID, then collects all descendants — so the UI can
+// render the full request flow (who called whom).
+func (h *Handlers) GetTaskTrace(w http.ResponseWriter, r *http.Request) {
+	authCtx, errResp := h.a2aAuth(r)
+	if errResp != nil {
+		respond(w, 401, J{"error": errResp.Message})
+		return
+	}
+	task, err := database.GetA2ATask(r.PathValue("id"))
+	if err != nil || !h.canViewA2ATask(authCtx, task) {
+		respond(w, 404, J{"error": "task not found"})
+		return
+	}
+	// Walk up to the root.
+	root := task
+	seen := map[string]bool{root.ID: true}
+	for root.ParentTaskID != "" {
+		p, err := database.GetA2ATask(root.ParentTaskID)
+		if err != nil || seen[p.ID] {
+			break
+		}
+		seen[p.ID] = true
+		root = p
+	}
+	// Collect root + all descendants (BFS).
+	nodes := []J{taskNodeJSON(root)}
+	collected := map[string]bool{root.ID: true}
+	queue := []string{root.ID}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		children, _ := database.ListA2ATasks(database.A2ATaskFilter{ParentTaskID: cur, Limit: 500})
+		for i := range children {
+			c := &children[i]
+			if collected[c.ID] {
+				continue
+			}
+			collected[c.ID] = true
+			nodes = append(nodes, taskNodeJSON(c))
+			queue = append(queue, c.ID)
+		}
+	}
+	respond(w, 200, J{"rootId": root.ID, "nodes": nodes})
+}
+
+// GetTaskThread returns the whole conversation a task belongs to — every turn
+// (root ask) that shares its session, in time order, each with its delegation
+// subtree nested. Reused threads are continuations of one chat, so this shows
+// them together rather than as isolated asks.
+func (h *Handlers) GetTaskThread(w http.ResponseWriter, r *http.Request) {
+	authCtx, errResp := h.a2aAuth(r)
+	if errResp != nil {
+		respond(w, 401, J{"error": errResp.Message})
+		return
+	}
+	task, err := database.GetA2ATask(r.PathValue("id"))
+	if err != nil || !h.canViewA2ATask(authCtx, task) {
+		respond(w, 404, J{"error": "task not found"})
+		return
+	}
+	// Walk up to the root of whatever subtree this task is in.
+	root := task
+	seen := map[string]bool{root.ID: true}
+	for root.ParentTaskID != "" {
+		p, perr := database.GetA2ATask(root.ParentTaskID)
+		if perr != nil || seen[p.ID] {
+			break
+		}
+		seen[p.ID] = true
+		root = p
+	}
+	// All root turns sharing this session = the conversation.
+	all, _ := database.ListA2ATasks(database.A2ATaskFilter{Session: root.RuntimeSession, Limit: 500})
+	var roots []*database.A2ATask
+	for i := range all {
+		if all[i].ParentTaskID == "" {
+			roots = append(roots, &all[i])
+		}
+	}
+	sort.Slice(roots, func(i, j int) bool { return roots[i].CreatedAt.Before(roots[j].CreatedAt) })
+	turns := make([]J, 0, len(roots))
+	for _, rt := range roots {
+		node := taskNodeJSON(rt)
+		node["children"] = h.taskSubtree(rt.ID, 0)
+		turns = append(turns, node)
+	}
+	respond(w, 200, J{
+		"session": root.RuntimeSession,
+		"caller":  root.CallerName,
+		"focusId": task.ID,
+		"turns":   turns,
+	})
+}
+
+// taskSubtree returns a task's descendants as nested nodes (each with children).
+func (h *Handlers) taskSubtree(parentID string, depth int) []J {
+	if depth > 12 { // guard against cycles
+		return nil
+	}
+	children, _ := database.ListA2ATasks(database.A2ATaskFilter{ParentTaskID: parentID, Limit: 200})
+	out := make([]J, 0, len(children))
+	for i := range children {
+		node := taskNodeJSON(&children[i])
+		node["children"] = h.taskSubtree(children[i].ID, depth+1)
+		out = append(out, node)
+	}
+	return out
+}
+
+// IngestAgentActivity records local (same-clutch) delegation hops that clutch
+// reports in batches — they bypass the control plane at run time, so this is how
+// they land in the activity/trace view alongside CP-routed hops.
+func (h *Handlers) IngestAgentActivity(w http.ResponseWriter, r *http.Request) {
+	reg := registrationFromCtx(r)
+	var req struct {
+		Entries []struct {
+			ParentTaskID  string `json:"parentTaskId"`
+			Source        string `json:"source"`
+			SourceAgentID string `json:"sourceAgentId"`
+			Target        string `json:"target"`
+			TargetAgentID string `json:"targetAgentId"`
+			Session       string `json:"session"`
+			Runner        string `json:"runner"`
+			Prompt        string `json:"prompt"`
+			State         string `json:"state"`
+			Ts            string `json:"ts"`
+		} `json:"entries"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respond(w, 400, J{"error": "invalid JSON"})
+		return
+	}
+	regName := ""
+	if reg != nil {
+		regName = reg.Name
+	}
+	for _, e := range req.Entries {
+		state := e.State
+		if state == "" {
+			state = "completed"
+		}
+		ts := time.Now().UTC()
+		if e.Ts != "" {
+			if parsed, perr := time.Parse(time.RFC3339, e.Ts); perr == nil {
+				ts = parsed
+			}
+		}
+		userMsg := a2aMessage{Kind: "message", MessageID: "msg_" + randomID(8), Role: "user", ContextID: e.Session, Parts: []a2aPart{{Kind: "text", Text: e.Prompt}}}
+		histJSON, _ := json.Marshal([]a2aMessage{userMsg})
+		metaJSON, _ := json.Marshal(J{"clawmatrix": J{"local": true, "registration": regName, "session": e.Session, "source": e.Source, "target": e.Target}})
+		task := &database.A2ATask{
+			ID:              "task_" + randomID(12),
+			ContextID:       e.Session,
+			RuntimeSession:  e.Session,
+			RuntimeRunner:   e.Runner,
+			StatusState:     state,
+			StatusTimestamp: ts,
+			History:         string(histJSON),
+			Metadata:        string(metaJSON),
+			SourceAgentID:   e.SourceAgentID,
+			SourceProfile:   e.Source,
+			TargetAgentID:   e.TargetAgentID,
+			TargetProfile:   e.Target,
+			CallerKind:      "agent",
+			CallerName:      e.Source,
+			ParentTaskID:    e.ParentTaskID,
+		}
+		database.CreateA2ATask(task)
+	}
+	respond(w, 200, J{"ok": true, "recorded": len(req.Entries)})
+}
+
+// taskPromptPreview pulls the first user message text from a task's history.
+func taskPromptPreview(historyJSON string) string {
+	var hist []a2aMessage
+	json.Unmarshal([]byte(historyJSON), &hist)
+	for _, m := range hist {
+		if m.Role == "user" {
+			return messageText(m)
+		}
+	}
+	return ""
+}
+
+func truncate(s string, n int) string {
+	s = strings.TrimSpace(s)
+	if len(s) > n {
+		return s[:n] + "…"
+	}
+	return s
+}
+
 func (h *Handlers) a2aMessageSend(w http.ResponseWriter, r *http.Request, req a2aRequest, authCtx *a2aAuthContext, target string) {
 	var params struct {
 		Message  a2aMessage     `json:"message"`
@@ -227,6 +492,7 @@ func (h *Handlers) a2aMessageSend(w http.ResponseWriter, r *http.Request, req a2
 	}
 	async, _ := cmMeta["async"].(bool)
 	sessionHint, _ := cmMeta["session"].(string)
+	parentTaskID, _ := cmMeta["parentTaskId"].(string) // set by clutch for agent→agent hops
 	source := h.a2aSourceName(authCtx)
 
 	contextID := params.Message.ContextID
@@ -268,6 +534,10 @@ func (h *Handlers) a2aMessageSend(w http.ResponseWriter, r *http.Request, req a2
 		SourceProfile:   source,
 		TargetAgentID:   targetAgent.ID,
 		TargetProfile:   target,
+		CallerKind:      authCtx.kind,
+		CallerUserID:    a2aCallerUserID(authCtx),
+		CallerName:      source,
+		ParentTaskID:    parentTaskID,
 	}
 	if err := database.CreateA2ATask(task); err != nil {
 		writeA2A(w, req.ID, nil, -32000, "failed to create task", nil)
@@ -343,7 +613,7 @@ func (h *Handlers) runA2ATask(taskID string, target *database.Agent, message, se
 	})
 	h.broadcastTask(taskID, "working")
 
-	response, err := callTargetAgent(target, message, session)
+	response, err := callTargetAgent(target, message, session, taskID)
 	task, _ := database.GetA2ATask(taskID)
 	if task == nil {
 		return
@@ -491,6 +761,14 @@ func (h *Handlers) a2aSourceName(authCtx *a2aAuthContext) string {
 	return "unknown"
 }
 
+// a2aCallerUserID returns the initiating user's id for user/PAT asks, 0 otherwise.
+func a2aCallerUserID(authCtx *a2aAuthContext) uint {
+	if authCtx.user != nil {
+		return authCtx.user.ID
+	}
+	return 0
+}
+
 func (h *Handlers) a2aSourceAgentID(authCtx *a2aAuthContext) string {
 	if authCtx.agent != nil {
 		return authCtx.agent.ID
@@ -516,11 +794,13 @@ func healthyTargetAgent(target string) (*database.Agent, map[string]any, error) 
 	return nil, nil, fmt.Errorf("no healthy agent available for %s", target)
 }
 
-func callTargetAgent(agent *database.Agent, message, session string) (string, error) {
+func callTargetAgent(agent *database.Agent, message, session, taskID string) (string, error) {
 	var meta map[string]any
 	json.Unmarshal([]byte(agent.Meta), &meta)
 	chatURL, _ := meta["chatUrl"].(string)
-	payload := J{"message": message, "session": session}
+	// taskId lets clutch stash "this agent is serving task X" so any delegation
+	// the agent makes mid-run can be linked back as a child (ParentTaskID).
+	payload := J{"message": message, "session": session, "taskId": taskID}
 	body, _ := json.Marshal(payload)
 	req, err := http.NewRequestWithContext(context.Background(), "POST", chatURL, bytes.NewReader(body))
 	if err != nil {
