@@ -2,6 +2,28 @@
   "models": {
     "mode": "merge",
     "providers": {
+      "vertex-litellm": {
+        "baseUrl": "http://host.docker.internal:4000/v1",
+        "api": "openai-completions",
+        "apiKey": "sk-litellm-local",
+        "authHeader": true,
+        "models": [
+          {
+            "id": "gemini-flash",
+            "name": "Vertex Gemini 2.5 Flash (via LiteLLM)",
+            "reasoning": false,
+            "input": ["text"],
+            "contextWindow": 1000000,
+            "maxTokens": 8192,
+            "compat": {
+              "supportsTools": true,
+              "supportsStrictMode": false,
+              "supportsPromptCacheKey": false,
+              "supportsStore": false
+            }
+          }
+        ]
+      },
       "cloudflare-workers-ai": {
         "baseUrl": "https://api.cloudflare.com/client/v4/accounts/__CLOUDFLARE_ACCOUNT_ID__/ai/v1",
         "api": "openai-completions",
@@ -30,9 +52,9 @@
   "agents": {
     "defaults": {
       "models": {
-        "cloudflare-workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct": {}
+        "vertex-litellm/gemini-flash": {}
       },
-      "model": { "primary": "cloudflare-workers-ai/@cf/mistralai/mistral-small-3.1-24b-instruct" },
+      "model": { "primary": "vertex-litellm/gemini-flash" },
       "compaction": { "mode": "safeguard" },
       "maxConcurrent": 2,
       "subagents": { "maxConcurrent": 4 },

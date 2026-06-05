@@ -306,7 +306,10 @@ function showTab(name, btn) {
   if (name === 'crons') loadCrons();
   if (name === 'events') loadEventsTab();
   if (name === 'humans') loadHumans();
+  if (name === 'teams') loadTeams();
   if (name === 'roles') loadRoles();
+  if (name === 'tokens') loadTokens();
+  if (name === 'uploads') loadUploads();
 }
 
 function initTabFromHash() {
@@ -334,7 +337,7 @@ function initTabFromHash() {
     if (agentId) sessRestoreFromHash(agentId, fileName);
     return;
   }
-  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'humans', 'roles'].includes(hash)) {
+  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'humans', 'teams', 'roles'].includes(hash)) {
     showTab(hash);
   }
 }
@@ -473,4 +476,6 @@ function refresh() {
   if (active && active.id === 'events-tab') loadEventsTab();
   if (active && active.id === 'humans-tab') loadHumans();
   if (active && active.id === 'roles-tab') loadRoles();
+  if (active && active.id === 'tokens-tab') loadTokens();
+  if (active && active.id === 'uploads-tab') loadUploads();
 }

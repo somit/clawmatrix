@@ -30,6 +30,7 @@
     { "source": "ceo", "target": "marketing-manager" },
     { "source": "ceo", "target": "sales-manager" },
     { "source": "sales-manager", "target": "marketing-manager" },
+    { "source": "marketing-manager", "target": "sales-manager" },
     { "source": "cto", "target": "techlead" }
   ]
 }

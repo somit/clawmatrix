@@ -9,7 +9,8 @@ import (
 
 // RegisteredAgent holds per-agent state for multi-agent support.
 type RegisteredAgent struct {
-	id                string // local id: "cto", "mflead"
+	id                string // local id: "cto-id", "techlead-id"
+	group             string // profile/group name used as a delegation target: "cto", "techlead"
 	fullID            string // CP id: "cto-cto", "mflead-mflead"
 	agentToken        string // per-agent auth token from CP
 	registrationToken string // registration token (for heartbeats/config); empty for primary
@@ -43,6 +44,7 @@ var (
 
 	PreferredAgentID    string
 	PreferredAgentGroup string // role/group name (AGENT_GROUP env), defaults to agent id
+	AgentDescription    string // capability summary (AGENT_DESCRIPTION env) declared to the directory for discovery
 
 	AgentCmd     string // e.g. "picoclaw agent"
 	AgentTimeout time.Duration

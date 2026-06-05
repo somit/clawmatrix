@@ -376,6 +376,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .mono { font-family: monospace; font-size: 12px; }
 .env-pills { display: flex; gap: 4px; flex-wrap: wrap; }
 .pill { font-size: 11px; padding: 2px 7px; border-radius: 4px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+.pill-team { background: var(--accent, #6366f1); color: #fff; border-color: transparent; }
 
 /* Buttons */
 .btn {
@@ -477,6 +478,7 @@ tr:hover td { background: rgba(255,255,255,0.02); }
   gap: 16px;
   box-shadow: 0 32px 80px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04);
 }
+.modal.modal-wide { width: 720px; }
 
 .modal h2, .modal h3 { font-size: 15px; font-weight: 600; margin: 0; }
 .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
@@ -801,6 +803,11 @@ tr:hover td { background: rgba(255,255,255,0.02); }
 .chat-ts { display: block; font-size: 10px; color: var(--muted); margin-top: 5px; opacity: 0.6; }
 .chat-msg.user .chat-ts { text-align: right; color: rgba(255,255,255,0.55); }
 .chat-queue-notice { padding: 4px 16px 6px; font-size: 11px; color: var(--muted); background: var(--bg); border-top: 1px solid var(--border); text-align: center; }
+.chat-attach-btn { background: var(--bg) !important; border: 1px solid var(--border) !important; padding: 0 10px !important; font-size: 16px; line-height: 1; }
+.chat-attachments { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 16px 0; }
+.chat-attachment-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 3px 10px; color: var(--text); }
+.chat-attachment-chip button { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 14px; padding: 0; line-height: 1; }
+.chat-attachment-chip button:hover { color: var(--red); }
 .chat-typing { align-self: flex-start; color: var(--muted); font-size: 12px; padding: 4px 0; }
 
 /* Cron table */

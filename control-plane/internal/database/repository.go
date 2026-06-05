@@ -122,18 +122,24 @@ func CreateAgentProfile(name, description, image, deploymentConfig, source strin
 	return t, DB.Create(t).Error
 }
 
-// UpsertAgentProfile creates the profile if it doesn't exist, or updates source if it does.
-func UpsertAgentProfile(name, registrationName, source string) (*AgentProfile, error) {
+// UpsertAgentProfile creates the profile if it doesn't exist, or updates source
+// (and description, when the agent declares one) if it does. An empty description
+// never overwrites an existing one, so re-registration without it is non-destructive.
+func UpsertAgentProfile(name, registrationName, source, description string) (*AgentProfile, error) {
 	existing, err := GetAgentProfile(name)
 	if err == nil {
-		DB.Model(existing).Updates(map[string]any{
+		updates := map[string]any{
 			"source":     source,
 			"updated_at": time.Now().UTC(),
-		})
+		}
+		if description != "" {
+			updates["description"] = description
+		}
+		DB.Model(existing).Updates(updates)
 		return existing, nil
 	}
 	reg := registrationName
-	return CreateAgentProfile(name, "", "", "", source, &reg, 0, -1)
+	return CreateAgentProfile(name, description, "", "", source, &reg, 0, -1)
 }
 
 func GetAgentProfile(name string) (*AgentProfile, error) {
@@ -152,6 +158,7 @@ func UpdateAgentProfile(name string, updates map[string]any) error {
 }
 
 func DeleteAgentProfile(name string) error {
+	DeleteBindingsForResource(ResourceProfile, name)
 	return DB.Where("name = ?", name).Delete(&AgentProfile{}).Error
 }
 

@@ -3,6 +3,7 @@ package clutch
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -44,6 +45,19 @@ func handleDelegate(w http.ResponseWriter, r *http.Request) {
 		WriteJSON(w, 400, map[string]string{"error": "message required"})
 		return
 	}
+
+	// Same-registration routing: if the target is an agent served by this clutch
+	// instance, run it directly instead of round-tripping through the control
+	// plane. Async delegations still go through the control plane so the caller
+	// gets a trackable A2A task.
+	if !async {
+		if agent := findLocalAgent(target); agent != nil {
+			log.Printf("local delegation to %s (same-registration)", target)
+			LocalDelegateAsk(w, r, agent)
+			return
+		}
+	}
+
 	source := r.Header.Get("X-Clutch-Agent")
 	a2aBody := map[string]any{
 		"jsonrpc": "2.0",
@@ -231,11 +245,14 @@ func handleCrons(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func findLocalAgent(id string) *RegisteredAgent {
+// findLocalAgent resolves a delegation target to an agent served by this clutch
+// instance. The target may be a local id ("techlead-id") or a profile/group
+// name ("techlead") — delegation targets use the latter.
+func findLocalAgent(target string) *RegisteredAgent {
 	RegisteredAgentsMu.RLock()
 	defer RegisteredAgentsMu.RUnlock()
 	for i := range RegisteredAgents {
-		if RegisteredAgents[i].id == id {
+		if RegisteredAgents[i].id == target || RegisteredAgents[i].group == target {
 			return &RegisteredAgents[i]
 		}
 	}

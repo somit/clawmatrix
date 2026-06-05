@@ -25,6 +25,7 @@ def list_clawmatrix_agents() -> dict[str, Any]:
         agents.append(
             {
                 "name": name,
+                "description": str(peer.get("description", "")).strip(),
                 "runner": _peer_runner(peer),
             }
         )

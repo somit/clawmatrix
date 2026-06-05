@@ -47,9 +47,22 @@ type a2aMessage struct {
 }
 
 type a2aPart struct {
-	Kind string `json:"kind"`
-	Text string `json:"text,omitempty"`
+	Kind string       `json:"kind"`
+	Text string       `json:"text,omitempty"`
+	File *a2aFilePart `json:"file,omitempty"`
 }
+
+// a2aFilePart is an A2A FilePart. Attachments are uploaded to the control plane
+// first (POST /uploads) and referenced here by uri (clawmatrix://uploads/<id>).
+type a2aFilePart struct {
+	Name     string `json:"name,omitempty"`
+	MimeType string `json:"mimeType,omitempty"`
+	URI      string `json:"uri,omitempty"`   // clawmatrix://uploads/<id>
+	Bytes    string `json:"bytes,omitempty"` // inline base64 — not supported; upload instead
+}
+
+// uploadURIPrefix is the scheme a FilePart.uri uses to reference a stored upload.
+const uploadURIPrefix = "clawmatrix://uploads/"
 
 type a2aTaskStatus struct {
 	State     string      `json:"state"`
@@ -189,8 +202,16 @@ func (h *Handlers) a2aMessageSend(w http.ResponseWriter, r *http.Request, req a2
 	}
 
 	text := strings.TrimSpace(messageText(params.Message))
+	attachBlock, aerr := h.resolveAttachments(authCtx, params.Message)
+	if aerr != nil {
+		writeA2A(w, req.ID, nil, -32602, aerr.Error(), nil)
+		return
+	}
+	if attachBlock != "" {
+		text = strings.TrimSpace(text + "\n\n" + attachBlock)
+	}
 	if text == "" {
-		writeA2A(w, req.ID, nil, -32602, "message text required", nil)
+		writeA2A(w, req.ID, nil, -32602, "message text or an attachment is required", nil)
 		return
 	}
 
@@ -320,6 +341,7 @@ func (h *Handlers) runA2ATask(taskID string, target *database.Agent, message, se
 		"status_message":   string(msgJSON),
 		"status_timestamp": now,
 	})
+	h.broadcastTask(taskID, "working")
 
 	response, err := callTargetAgent(target, message, session)
 	task, _ := database.GetA2ATask(taskID)
@@ -374,6 +396,16 @@ func (h *Handlers) runA2ATask(taskID string, target *database.Agent, message, se
 		"history":          string(historyJSON),
 		"artifacts":        string(artifactsJSON),
 	})
+	h.broadcastTask(taskID, state)
+}
+
+// broadcastTask pushes a task state change over the SSE hub so clients can await
+// completion (or stream progress) instead of polling.
+func (h *Handlers) broadcastTask(taskID, state string) {
+	if h.hub == nil {
+		return
+	}
+	h.hub.Broadcast(Event{Type: "task:updated", Data: J{"id": taskID, "state": state}})
 }
 
 func (h *Handlers) a2aAuth(r *http.Request) (*a2aAuthContext, *a2aError) {
@@ -391,15 +423,15 @@ func (h *Handlers) a2aAuth(r *http.Request) (*a2aAuthContext, *a2aError) {
 		}
 		return &a2aAuthContext{kind: "agent", agent: agent, sourceProfile: source}, nil
 	}
-	claims, err := auth.Verify(tok)
-	if err != nil {
-		return nil, &a2aError{Code: -32001, Message: "unauthorized"}
+	if claims, err := auth.Verify(tok); err == nil {
+		if u, err := database.GetUserByID(claims.UserID); err == nil {
+			return &a2aAuthContext{kind: "user", user: u}, nil
+		}
 	}
-	u, err := database.GetUserByID(claims.UserID)
-	if err != nil {
-		return nil, &a2aError{Code: -32001, Message: "unauthorized"}
+	if u, err := database.GetUserByToken(tok); err == nil && u != nil {
+		return &a2aAuthContext{kind: "user", user: u}, nil
 	}
-	return &a2aAuthContext{kind: "user", user: u}, nil
+	return nil, &a2aError{Code: -32001, Message: "unauthorized"}
 }
 
 func (h *Handlers) canSendToTarget(authCtx *a2aAuthContext, target string) bool {
@@ -569,6 +601,46 @@ func messageText(msg a2aMessage) string {
 		}
 	}
 	return strings.TrimSpace(strings.Join(parts, "\n"))
+}
+
+// resolveAttachments turns FilePart references into a human/agent-readable
+// "[Attachments]" block carrying a signed, time-limited download link per file.
+// The agent fetches these with its own tools; clutch/runners stay text-only.
+// Users may only attach uploads they own.
+func (h *Handlers) resolveAttachments(authCtx *a2aAuthContext, msg a2aMessage) (string, error) {
+	var refs []uploadRef
+	for _, p := range msg.Parts {
+		if p.Kind != "file" || p.File == nil {
+			continue
+		}
+		f := p.File
+		if f.URI == "" {
+			if f.Bytes != "" {
+				return "", fmt.Errorf("inline attachment bytes are not supported — upload the file via POST /uploads first, then reference it by uri")
+			}
+			return "", fmt.Errorf("attachment is missing a uri")
+		}
+		refs = append(refs, uploadRef{Name: f.Name, URI: f.URI})
+	}
+	// User senders may only attach their own uploads; agent/registration senders bypass.
+	userID := uint(0)
+	admin := true
+	if authCtx.kind == "user" {
+		userID = authCtx.user.ID
+		admin = isAdmin(authCtx.user)
+	}
+	return h.attachmentBlock(userID, admin, refs)
+}
+
+func humanSize(n int64) string {
+	switch {
+	case n >= 1<<20:
+		return fmt.Sprintf("%.1f MB", float64(n)/(1<<20))
+	case n >= 1<<10:
+		return fmt.Sprintf("%.1f KB", float64(n)/(1<<10))
+	default:
+		return fmt.Sprintf("%d B", n)
+	}
 }
 
 func ensureMessageDefaults(msg a2aMessage, contextID string) a2aMessage {

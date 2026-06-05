@@ -64,6 +64,9 @@ func Register() {
 			log.Fatal("agent ID required: set AGENT_ID env or --agent-id flag")
 		}
 		meta := map[string]any{"runner": Runner}
+		if AgentDescription != "" {
+			meta["description"] = AgentDescription
+		}
 		for _, kv := range [][2]string{
 			{"AGENT_IMAGE", "image"},
 			{"CHAT_URL", "chatUrl"},
@@ -158,6 +161,7 @@ func Register() {
 		}
 		finalAgents = append(finalAgents, RegisteredAgent{
 			id:                localID,
+			group:             d.Group,
 			fullID:            ag.AgentID,
 			agentToken:        ag.Token,
 			registrationToken: regToken,

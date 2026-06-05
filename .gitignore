@@ -12,3 +12,7 @@ clutch/clutch
 docs/roadmap-thinking/
 temp-logs/*
 !temp-logs/.gitkeep
+
+# python bytecode
+**/__pycache__/
+*.pyc

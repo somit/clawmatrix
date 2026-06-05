@@ -166,6 +166,7 @@ func main() {
 	}
 	clutch.PreferredAgentID = *preferredID
 	clutch.PreferredAgentGroup = os.Getenv("AGENT_GROUP")
+	clutch.AgentDescription = os.Getenv("AGENT_DESCRIPTION")
 
 	clutch.AgentCmd = *agentCmdFlag
 	if clutch.AgentCmd == "" {

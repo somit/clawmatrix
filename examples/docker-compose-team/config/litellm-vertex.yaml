@@ -1,0 +1,20 @@
+# LiteLLM proxy → Vertex AI (Gemini), OpenAI-compatible.
+# Fronts Vertex so OpenAI-only clients (e.g. openclaw) can use Gemini.
+# Auth: GCP ADC mounted from the host (~/.config/gcloud).
+model_list:
+  - model_name: gemini-flash
+    litellm_params:
+      model: vertex_ai/gemini-2.5-flash
+      vertex_project: wealthy-prod-app-669
+      vertex_location: us-central1
+  - model_name: gemini-3-flash
+    litellm_params:
+      model: vertex_ai/gemini-3-flash-preview
+      vertex_project: wealthy-prod-app-669
+      vertex_location: global
+
+litellm_settings:
+  drop_params: true
+
+general_settings:
+  master_key: sk-litellm-local

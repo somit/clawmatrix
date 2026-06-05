@@ -1,5 +1,11 @@
 // --- Agents ---
 
+// canManageAccess reports whether the current user may edit ACLs (admins).
+function canManageAccess() {
+  return !!(currentUser && Array.isArray(currentUser.permissions)
+    && currentUser.permissions.includes('can_manage_profiles'));
+}
+
 async function loadAgents() {
   const templateFilter = document.getElementById('template-filter').value;
   const path = '/agents' + (templateFilter ? '?type=' + templateFilter : '');
@@ -39,7 +45,7 @@ async function loadAgents() {
               <td class="mono">${a.stats.allowed} ok / ${a.stats.blocked} blk${a.stats.avgMs ? ' / ' + a.stats.avgMs + 'ms avg' : ''}</td>
               <td>${timeAgo(a.registeredAt)}</td>
               <td>${timeAgo(a.lastHeartbeat)}</td>
-              <td style="display:flex;gap:4px">${hasWorkspace ? `<button class="btn btn-sm btn-blue" onclick="openWorkspace('${esc(a.id)}')">Workspace</button>` : ''}${hasSessions ? `<button class="btn btn-sm btn-yellow" onclick="openSessions('${esc(a.id)}')">Sessions</button>` : ''}${hasChatUrl ? `<button class="btn btn-sm btn-accent" onclick="openChat('${esc(a.id)}', '${esc(a.name)}')">Chat</button>` : ''}</td>
+              <td style="display:flex;gap:4px">${hasWorkspace ? `<button class="btn btn-sm btn-blue" onclick="openWorkspace('${esc(a.id)}')">Workspace</button>` : ''}${hasSessions ? `<button class="btn btn-sm btn-yellow" onclick="openSessions('${esc(a.id)}')">Sessions</button>` : ''}${hasChatUrl ? `<button class="btn btn-sm btn-accent" onclick="openChat('${esc(a.id)}', '${esc(a.name)}')">Chat</button>` : ''}${canManageAccess() ? `<button class="btn btn-sm" onclick="showAgentACLModal('${esc(a.id)}')">Access</button>` : ''}</td>
             </tr>
           `}).join('')}
         </tbody>

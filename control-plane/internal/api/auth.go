@@ -353,47 +353,179 @@ func (h *Handlers) RemoveRolePermission(w http.ResponseWriter, r *http.Request) 
 	respond(w, 200, J{"ok": true})
 }
 
-// --- Profile ACL ---
+// --- Access bindings (resource ACLs) ---
 
-func (h *Handlers) ListProfileACL(w http.ResponseWriter, r *http.Request) {
-	profile := r.PathValue("name")
-	acls, err := database.ListProfileACL(profile)
+// bindingToJSON renders an AccessBinding for the admin UI, resolving the
+// principal to a human-readable label.
+func bindingToJSON(b *database.AccessBinding) J {
+	label := ""
+	switch b.PrincipalType {
+	case database.PrincipalUser:
+		if u, err := database.GetUserByID(b.PrincipalID); err == nil {
+			label = u.Username
+		}
+	case database.PrincipalGroup:
+		if g, err := database.GetGroup(b.PrincipalID); err == nil {
+			label = g.Name
+		}
+	}
+	return J{
+		"principal_type":  b.PrincipalType,
+		"principal_id":    b.PrincipalID,
+		"principal_label": label,
+		"role_id":         b.RoleID,
+		"role_name":       b.Role.Name,
+	}
+}
+
+func listBindings(w http.ResponseWriter, resourceType, resourceID string) {
+	bindings, err := database.ListBindings(resourceType, resourceID)
 	if err != nil {
 		respond(w, 500, J{"error": err.Error()})
 		return
 	}
-	respond(w, 200, acls)
+	out := make([]J, 0, len(bindings))
+	for i := range bindings {
+		out = append(out, bindingToJSON(&bindings[i]))
+	}
+	respond(w, 200, out)
+}
+
+// setBindingReq is the body for granting a (principal → role) on a resource.
+// principal_type defaults to "user" when omitted, so existing user-only clients
+// keep working.
+type setBindingReq struct {
+	PrincipalType string `json:"principal_type"`
+	PrincipalID   uint   `json:"principal_id"`
+	UserID        uint   `json:"user_id"` // legacy alias for principal_id when type=user
+	RoleID        uint   `json:"role_id"`
+}
+
+func (req *setBindingReq) normalize() (ptype string, pid, roleID uint, ok bool) {
+	ptype = req.PrincipalType
+	if ptype == "" {
+		ptype = database.PrincipalUser
+	}
+	pid = req.PrincipalID
+	if pid == 0 {
+		pid = req.UserID // legacy field
+	}
+	if ptype != database.PrincipalUser && ptype != database.PrincipalGroup {
+		return "", 0, 0, false
+	}
+	if pid == 0 || req.RoleID == 0 {
+		return "", 0, 0, false
+	}
+	return ptype, pid, req.RoleID, true
+}
+
+func setBinding(w http.ResponseWriter, r *http.Request, resourceType, resourceID string) {
+	var req setBindingReq
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respond(w, 400, J{"error": "invalid body"})
+		return
+	}
+	ptype, pid, roleID, ok := req.normalize()
+	if !ok {
+		respond(w, 400, J{"error": "principal_id (or user_id) and role_id required; principal_type must be user or group"})
+		return
+	}
+	if err := database.SetBinding(ptype, pid, resourceType, resourceID, roleID); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
+func deleteBinding(w http.ResponseWriter, r *http.Request, resourceType, resourceID string) {
+	ptype := r.PathValue("ptype")
+	if ptype == "" {
+		ptype = database.PrincipalUser // legacy /acl/{user_id} path
+	}
+	pid, err := strconv.ParseUint(r.PathValue("pid"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid principal id"})
+		return
+	}
+	if err := database.DeleteBinding(ptype, uint(pid), resourceType, resourceID); err != nil {
+		respond(w, 500, J{"error": err.Error()})
+		return
+	}
+	respond(w, 200, J{"ok": true})
+}
+
+// Profile ACL endpoints.
+func (h *Handlers) ListProfileACL(w http.ResponseWriter, r *http.Request) {
+	listBindings(w, database.ResourceProfile, r.PathValue("name"))
 }
 
 func (h *Handlers) SetProfileACL(w http.ResponseWriter, r *http.Request) {
-	profile := r.PathValue("name")
-	var req struct {
-		UserID uint `json:"user_id"`
-		RoleID uint `json:"role_id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.UserID == 0 || req.RoleID == 0 {
-		respond(w, 400, J{"error": "user_id and role_id required"})
-		return
-	}
-	if err := database.SetProfileACL(profile, req.UserID, req.RoleID); err != nil {
-		respond(w, 500, J{"error": err.Error()})
-		return
-	}
-	respond(w, 200, J{"ok": true})
+	setBinding(w, r, database.ResourceProfile, r.PathValue("name"))
 }
 
 func (h *Handlers) DeleteProfileACL(w http.ResponseWriter, r *http.Request) {
-	profile := r.PathValue("name")
-	userID, err := strconv.ParseUint(r.PathValue("user_id"), 10, 64)
+	deleteBinding(w, r, database.ResourceProfile, r.PathValue("name"))
+}
+
+// Agent ACL endpoints.
+func (h *Handlers) ListAgentACL(w http.ResponseWriter, r *http.Request) {
+	listBindings(w, database.ResourceAgent, r.PathValue("id"))
+}
+
+func (h *Handlers) SetAgentACL(w http.ResponseWriter, r *http.Request) {
+	setBinding(w, r, database.ResourceAgent, r.PathValue("id"))
+}
+
+func (h *Handlers) DeleteAgentACL(w http.ResponseWriter, r *http.Request) {
+	deleteBinding(w, r, database.ResourceAgent, r.PathValue("id"))
+}
+
+// accessEntryJSON renders one grant from a principal's point of view.
+func accessEntryJSON(b *database.AccessBinding, source string) J {
+	return J{
+		"resource_type": b.ResourceType,
+		"resource_id":   b.ResourceID,
+		"role_name":     b.Role.Name,
+		"source":        source, // "direct" | "team:<name>"
+	}
+}
+
+// UserAccess lists every resource the user can reach, both grants made directly
+// to the user and grants inherited from each team they belong to.
+func (h *Handlers) UserAccess(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
 	if err != nil {
-		respond(w, 400, J{"error": "invalid user_id"})
+		respond(w, 400, J{"error": "invalid id"})
 		return
 	}
-	if err := database.DeleteProfileACL(profile, uint(userID)); err != nil {
-		respond(w, 500, J{"error": err.Error()})
+	out := []J{}
+	direct, _ := database.ListBindingsForPrincipal(database.PrincipalUser, uint(id))
+	for i := range direct {
+		out = append(out, accessEntryJSON(&direct[i], "direct"))
+	}
+	groups, _ := database.GroupsForUser(uint(id))
+	for _, g := range groups {
+		viaTeam, _ := database.ListBindingsForPrincipal(database.PrincipalGroup, g.ID)
+		for i := range viaTeam {
+			out = append(out, accessEntryJSON(&viaTeam[i], "team:"+g.Name))
+		}
+	}
+	respond(w, 200, out)
+}
+
+// GroupAccess lists every resource a team can reach.
+func (h *Handlers) GroupAccess(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.ParseUint(r.PathValue("id"), 10, 64)
+	if err != nil {
+		respond(w, 400, J{"error": "invalid id"})
 		return
 	}
-	respond(w, 200, J{"ok": true})
+	bindings, _ := database.ListBindingsForPrincipal(database.PrincipalGroup, uint(id))
+	out := []J{}
+	for i := range bindings {
+		out = append(out, accessEntryJSON(&bindings[i], "direct"))
+	}
+	respond(w, 200, out)
 }
 
 func hashPassword(password string) (string, error) {

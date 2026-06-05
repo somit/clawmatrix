@@ -16,6 +16,7 @@ import (
 	cronpkg "control-plane/internal/cron"
 	"control-plane/internal/database"
 	"control-plane/internal/metrics"
+	"control-plane/internal/storage"
 	"control-plane/internal/worker"
 )
 
@@ -105,7 +106,13 @@ func main() {
 		log.Printf("OIDC enabled (issuer: %s)", cfg.OIDCIssuerURL)
 	}
 
-	router := api.NewRouter(hub, scheduler, oidcCfg)
+	store, err := storage.New(storage.Config{Backend: cfg.UploadBackend, Dir: cfg.UploadDir, Bucket: cfg.UploadBucket})
+	if err != nil {
+		log.Fatalf("storage init: %v", err)
+	}
+	log.Printf("uploads: backend=%s", store.Backend())
+
+	router := api.NewRouter(hub, scheduler, oidcCfg, store, cfg.PublicBaseURL, cfg.JWTSecret)
 	fmt.Println(`
 +--------------------+
 |    ClawMatrix      |
