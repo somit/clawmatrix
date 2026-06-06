@@ -1,8 +1,9 @@
-package clutch
+package runners
 
 import (
 	"encoding/json"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 )
@@ -11,11 +12,13 @@ import (
 // When AgentGatewayURL is set, agentCmd uses "openclaw agent --agent <id>"
 // (no --local) which connects to the running gateway as a thin WS client —
 // no pipe inheritance, no zombies.
-type openclawRunner struct{}
+type openclawRunner struct {
+	cfg Config
+}
 
-func (o *openclawRunner) CommandArgs(agent *RegisteredAgent, msg, session string) []string {
+func (o *openclawRunner) CommandArgs(agent Agent, msg, session string) []string {
 	ocSession := strings.ReplaceAll(session, ":", "-")
-	return append(splitFields(agent.agentCmd), "--session-id", ocSession, "--json", "-m", msg)
+	return append(splitFields(agent.Command), "--session-id", ocSession, "--json", "-m", msg)
 }
 
 func (o *openclawRunner) UsesStdin() bool { return false }
@@ -32,13 +35,13 @@ func (o *openclawRunner) Env() []string {
 	return append(filtered, "HOME=/root")
 }
 
-func (o *openclawRunner) PrepareSession(agent *RegisteredAgent, session string) {
+func (o *openclawRunner) PrepareSession(agent Agent, session string) {
 	ocSession := strings.ReplaceAll(session, ":", "-")
 	// Try direct file first (subprocess mode stores as <sessionId>.jsonl).
-	repairOpenclawSession(agent.sessionsPath, ocSession)
+	repairOpenclawSession(agent.SessionsPath, ocSession)
 	// Also repair all sessions in the gateway's sessions.json (gateway mode
 	// stores sessions under UUID filenames regardless of --session-id).
-	repairAllGatewaySessions(agent.sessionsPath)
+	repairAllGatewaySessions(agent.SessionsPath)
 }
 
 func (o *openclawRunner) ParseOutput(stdout, _ string) (string, string, map[string]any) {
@@ -46,7 +49,7 @@ func (o *openclawRunner) ParseOutput(stdout, _ string) (string, string, map[stri
 }
 
 func (o *openclawRunner) AgentCmd(localID string) string {
-	if AgentGatewayURL != "" {
+	if o.cfg.AgentGatewayURL != "" {
 		return "openclaw agent --agent " + localID
 	}
 	return "openclaw agent --local --agent " + localID
@@ -56,8 +59,12 @@ func (o *openclawRunner) SessionsPath(localID string) string {
 	return openclawSessionsPath(localID)
 }
 
-func (o *openclawRunner) DiscoverAgents() []agentDiscovery {
+func (o *openclawRunner) DiscoverAgents() []Discovery {
 	return discoverOpenclawAgents()
+}
+
+func (o *openclawRunner) ServeSessions(http.ResponseWriter, *http.Request, Agent) bool {
+	return false
 }
 
 // --- openclaw agent discovery ---
@@ -83,7 +90,7 @@ func openclawSessionsPath(localID string) string {
 }
 
 // discoverOpenclawAgents reads the openclaw config and returns all configured agents.
-func discoverOpenclawAgents() []agentDiscovery {
+func discoverOpenclawAgents() []Discovery {
 	configPath := os.Getenv("OPENCLAW_CONFIG")
 	if configPath == "" {
 		configPath = "/root/.openclaw/openclaw.json"
@@ -114,13 +121,13 @@ func discoverOpenclawAgents() []agentDiscovery {
 		return nil
 	}
 
-	var agents []agentDiscovery
+	var agents []Discovery
 	for _, a := range cfg.Agents.List {
 		group := a.AgentGroup
 		if group == "" {
 			group = a.Name
 		}
-		agents = append(agents, agentDiscovery{
+		agents = append(agents, Discovery{
 			ID:        a.ID,
 			Group:     group,
 			Default:   a.Default,
@@ -194,11 +201,11 @@ func extractOcPayloads(payloads []ocPayload, usage map[string]any) (string, stri
 }
 
 // repairOpenclawSession sanitizes a session file before a new request:
-//   1. Strips trailing empty assistant messages (stopReason=toolUse/error/stop
-//      with empty content) — caused by 529 overload retries.
-//   2. Removes consecutive same-role messages — caused when a 529 fail is
-//      saved then the retry succeeds, leaving two consecutive assistant turns.
-//      In that case, empty/error turn is dropped, keeping the successful one.
+//  1. Strips trailing empty assistant messages (stopReason=toolUse/error/stop
+//     with empty content) — caused by 529 overload retries.
+//  2. Removes consecutive same-role messages — caused when a 529 fail is
+//     saved then the retry succeeds, leaving two consecutive assistant turns.
+//     In that case, empty/error turn is dropped, keeping the successful one.
 func repairOpenclawSession(sessionsPath, sessionID string) {
 	if sessionsPath == "" || sessionID == "" {
 		return

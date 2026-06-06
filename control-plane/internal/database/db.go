@@ -39,13 +39,17 @@ func Init(driver, uri string) error {
 
 	if err := DB.AutoMigrate(
 		&Registration{}, &Connection{}, &AgentProfile{}, &Agent{},
+		&A2ATask{},
 		&RequestLog{}, &Metric{}, &AuditEvent{}, &CronJob{}, &CronExecution{}, &AcmeCache{},
-		&User{}, &Role{}, &RolePermission{}, &AgentProfileACL{}, &UserIdentity{},
+		&User{}, &Role{}, &RolePermission{}, &AgentProfileACL{}, &UserIdentity{}, &UserToken{},
+		&AccessBinding{}, &HumanGroup{}, &HumanGroupMember{},
+		&Upload{},
 	); err != nil {
 		return err
 	}
 
 	SeedRoles()
+	migrateProfileACLToBindings()
 
 	log.Printf("database ready: %s (%s)", uri, driver)
 	return nil

@@ -18,6 +18,7 @@ import (
 
 	"control-plane/internal/database"
 	"control-plane/internal/metrics"
+	"control-plane/internal/storage"
 )
 
 // CronScheduler is implemented by internal/cron.Scheduler.
@@ -31,15 +32,25 @@ type CronScheduler interface {
 }
 
 type Handlers struct {
-	hub       *Hub
-	scheduler CronScheduler
-	oidc      *OIDCConfig
+	hub           *Hub
+	scheduler     CronScheduler
+	oidc          *OIDCConfig
+	store         storage.Store
+	publicBaseURL string // externally-reachable CP base for signed file links (no trailing slash)
+	signSecret    []byte // HMAC key for signed upload-access tokens
 }
 
 type J = map[string]any
 
-func NewHandlers(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig) *Handlers {
-	return &Handlers{hub: hub, scheduler: scheduler, oidc: oidc}
+func NewHandlers(hub *Hub, scheduler CronScheduler, oidc *OIDCConfig, store storage.Store, publicBaseURL, signSecret string) *Handlers {
+	return &Handlers{
+		hub:           hub,
+		scheduler:     scheduler,
+		oidc:          oidc,
+		store:         store,
+		publicBaseURL: strings.TrimRight(publicBaseURL, "/"),
+		signSecret:    []byte(signSecret),
+	}
 }
 
 // --- Admin ---
@@ -320,8 +331,17 @@ func (r *registerResult) toJSON() J {
 func (h *Handlers) registerOneAgent(reg *database.Registration, agentLocalID, agentGroup string, env, meta, gw json.RawMessage, now time.Time, isSubagent bool) (*registerResult, error) {
 	id := fmt.Sprintf("%s-%s", reg.Name, agentLocalID)
 
+	// Agents declare their own profile description via meta.description; it seeds
+	// the directory peers use for discovery-driven delegation.
+	var metaFields struct {
+		Description string `json:"description"`
+	}
+	if len(meta) > 0 {
+		json.Unmarshal(meta, &metaFields)
+	}
+
 	// Upsert AgentProfile — create if not exists, mark source as automatic
-	database.UpsertAgentProfile(agentGroup, reg.Name, "automatic")
+	database.UpsertAgentProfile(agentGroup, reg.Name, "automatic", metaFields.Description)
 
 	// Check if this agent already exists (re-registration after restart)
 	existing, err := database.GetAgent(id)
@@ -636,9 +656,14 @@ func (h *Handlers) ListAgents(w http.ResponseWriter, r *http.Request) {
 		for _, p := range visibleProfiles {
 			profileSet[p] = true
 		}
+		// Additive: also include agents granted directly at the agent level.
+		agentSet := make(map[string]bool)
+		for _, id := range database.VisibleAgentIDs(u.ID) {
+			agentSet[id] = true
+		}
 		filtered := agents[:0]
 		for _, a := range agents {
-			if a.AgentProfile != nil && profileSet[*a.AgentProfile] {
+			if (a.AgentProfile != nil && profileSet[*a.AgentProfile]) || agentSet[a.ID] {
 				filtered = append(filtered, a)
 			}
 		}
@@ -659,10 +684,8 @@ func (h *Handlers) GetAgent(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "not found"})
 		return
 	}
-	if agent.AgentProfile != nil {
-		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
-			return
-		}
+	if !checkAgentPerm(w, r, agent.ID, database.PermViewAgents) {
+		return
 	}
 	respond(w, 200, agentToJSON(agent))
 }
@@ -854,11 +877,12 @@ func (h *Handlers) ChatProxy(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 
 	var req struct {
-		Message string `json:"message"`
-		Session string `json:"session"`
+		Message     string      `json:"message"`
+		Session     string      `json:"session"`
+		Attachments []uploadRef `json:"attachments"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || strings.TrimSpace(req.Message) == "" {
-		respond(w, 400, J{"error": "message required"})
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respond(w, 400, J{"error": "invalid request"})
 		return
 	}
 
@@ -867,10 +891,23 @@ func (h *Handlers) ChatProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
-	if agent.AgentProfile != nil {
-		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermChatWithAgents) {
-			return
-		}
+	if !checkAgentPerm(w, r, agent.ID, database.PermChatWithAgents) {
+		return
+	}
+
+	// Resolve any attachments to a signed-link block appended to the message.
+	u := userFromCtx(r)
+	attachBlock, aerr := h.attachmentBlock(u.ID, isAdmin(u), req.Attachments)
+	if aerr != nil {
+		respond(w, 400, J{"error": aerr.Error()})
+		return
+	}
+	if attachBlock != "" {
+		req.Message = strings.TrimSpace(req.Message + "\n\n" + attachBlock)
+	}
+	if strings.TrimSpace(req.Message) == "" {
+		respond(w, 400, J{"error": "message or attachment required"})
+		return
 	}
 
 	// Parse chatUrl from agent's meta
@@ -948,10 +985,8 @@ func (h *Handlers) WorkspaceProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
-	if agent.AgentProfile != nil {
-		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
-			return
-		}
+	if !checkAgentPerm(w, r, agent.ID, database.PermViewAgents) {
+		return
 	}
 
 	var meta map[string]any
@@ -1002,14 +1037,12 @@ func (h *Handlers) WorkspaceLocksProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
-	if agent.AgentProfile != nil {
-		perm := database.PermViewAgents
-		if r.Method == http.MethodPut {
-			perm = database.PermConfigureAgents
-		}
-		if !checkProfilePerm(w, r, *agent.AgentProfile, perm) {
-			return
-		}
+	perm := database.PermViewAgents
+	if r.Method == http.MethodPut {
+		perm = database.PermConfigureAgents
+	}
+	if !checkAgentPerm(w, r, agent.ID, perm) {
+		return
 	}
 
 	var meta map[string]any
@@ -1061,10 +1094,8 @@ func (h *Handlers) SessionsProxy(w http.ResponseWriter, r *http.Request) {
 		respond(w, 404, J{"error": "agent not found"})
 		return
 	}
-	if agent.AgentProfile != nil {
-		if !checkProfilePerm(w, r, *agent.AgentProfile, database.PermViewAgents) {
-			return
-		}
+	if !checkAgentPerm(w, r, agent.ID, database.PermViewAgents) {
+		return
 	}
 
 	var meta map[string]any
@@ -2043,6 +2074,9 @@ func (h *Handlers) AgentConnections(w http.ResponseWriter, r *http.Request) {
 		entries := make([]J, 0, len(conns))
 		for _, c := range conns {
 			entry := J{"name": c.Target}
+			if tp, err := database.GetAgentProfile(c.Target); err == nil && tp.Description != "" {
+				entry["description"] = tp.Description
+			}
 			targets, _ := database.GetAgentsByName(c.Target)
 			var agentList []J
 			for _, t := range targets {

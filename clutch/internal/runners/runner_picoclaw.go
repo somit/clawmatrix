@@ -1,55 +1,81 @@
-package clutch
+package runners
 
 import (
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 )
 
 // picoclawRunner handles picoclaw-specific subprocess execution.
-type picoclawRunner struct{}
+type picoclawRunner struct {
+	cfg Config
+}
 
-func (p *picoclawRunner) CommandArgs(agent *RegisteredAgent, _ /*msg*/, session string) []string {
+func (p *picoclawRunner) CommandArgs(agent Agent, _ /*msg*/, session string) []string {
 	if !strings.HasPrefix(session, "agent:") {
 		session = "agent:main:" + session
 	}
-	return append(splitFields(agent.agentCmd), "--session", session)
+	return append(splitFields(agent.Command), "--session", session)
 }
 
 func (p *picoclawRunner) UsesStdin() bool { return true }
 
 func (p *picoclawRunner) Env() []string { return envAll() }
 
-func (p *picoclawRunner) PrepareSession(_ *RegisteredAgent, _ string) {} // no-op
+func (p *picoclawRunner) PrepareSession(_ Agent, _ string) {} // no-op
 
 func (p *picoclawRunner) ParseOutput(stdout, stderr string) (string, string, map[string]any) {
 	return parsePicoclawOutput(stdout), "", parsePicoclawUsage(stderr)
 }
 
-func (p *picoclawRunner) AgentCmd(_ string) string        { return AgentCmd }
-func (p *picoclawRunner) SessionsPath(_ string) string    { return SessionsPath }
-func (p *picoclawRunner) DiscoverAgents() []agentDiscovery { return nil }
+func (p *picoclawRunner) AgentCmd(_ string) string     { return p.cfg.AgentCmd }
+func (p *picoclawRunner) SessionsPath(_ string) string { return p.cfg.SessionsPath }
+func (p *picoclawRunner) DiscoverAgents() []Discovery  { return nil }
+func (p *picoclawRunner) ServeSessions(http.ResponseWriter, *http.Request, Agent) bool {
+	return false
+}
 
 // --- picoclaw output parsing ---
 
 func parsePicoclawOutput(raw string) string {
 	var lines []string
 	for _, line := range strings.Split(strings.TrimSpace(raw), "\n") {
-		if strings.Contains(line, "Interactive mode") {
+		line = stripANSI(line)
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
 			continue
 		}
-		if strings.TrimSpace(line) == "Goodbye!" {
+		if strings.Contains(trimmed, "Interactive mode") {
+			continue
+		}
+		if trimmed == "Goodbye!" {
+			continue
+		}
+		if strings.Contains(trimmed, "wealthyclaw") && strings.Contains(trimmed, "personal ai") {
+			continue
+		}
+		if strings.Contains(trimmed, "picoclaw") && strings.Contains(trimmed, "Personal AI Assistant") {
+			continue
+		}
+		if strings.Contains(trimmed, `\|/`) {
 			continue
 		}
 		if strings.HasPrefix(line, "🦞 ") {
 			lines = append(lines, line[len("🦞 "):])
-		} else if strings.TrimSpace(line) == "🦞" {
+		} else if trimmed == "🦞" {
 			continue
 		} else {
 			lines = append(lines, line)
 		}
 	}
 	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+var ansiRE = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
 }
 
 var picoclawUsageIntKeys = []string{

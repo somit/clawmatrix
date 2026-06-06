@@ -211,7 +211,8 @@ func CronsTab() templ.Component {
 	})
 }
 
-func EventsTab() templ.Component {
+// ActivityTab shows recent asks (who called which agent) for audit/observability.
+func ActivityTab() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -232,7 +233,36 @@ func EventsTab() templ.Component {
 			templ_7745c5c3_Var8 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<section id=\"events-tab\"><div class=\"section-header\"><h2>Audit Events</h2><div class=\"filter-bar\"><select id=\"event-type-filter\" onchange=\"loadEventsTab()\"><option value=\"\">All events</option> <option value=\"agent:registered\">Agent Registered</option> <option value=\"agent:stale\">Agent Stale</option> <option value=\"agent:recovered\">Agent Recovered</option> <option value=\"agent:killed\">Agent Killed</option> <option value=\"log:batch\">Log Batch</option> <option value=\"registration:created\">Registration Created</option> <option value=\"registration:updated\">Registration Updated</option> <option value=\"connection:created\">Connection Created</option> <option value=\"connection:deleted\">Connection Deleted</option> <option value=\"template:created\">Profile Created</option> <option value=\"template:updated\">Profile Updated</option></select><div class=\"time-range-bar\" id=\"events-time-range\"><button class=\"active\" onclick=\"setEventsRange('1h', this)\">1h</button> <button onclick=\"setEventsRange('24h', this)\">24h</button> <button onclick=\"setEventsRange('168h', this)\">7d</button></div><button class=\"btn btn-sm\" onclick=\"loadEventsTab()\">Refresh</button></div></div><div id=\"events-list\"></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<section id=\"activity-tab\"><div class=\"section-header\"><h2>Activity</h2><div class=\"filter-bar\"><input id=\"activity-caller-filter\" placeholder=\"Caller…\" style=\"width:140px\" onkeydown=\"if(event.key==='Enter')loadActivity()\"> <input id=\"activity-target-filter\" placeholder=\"Agent…\" style=\"width:140px\" onkeydown=\"if(event.key==='Enter')loadActivity()\"> <select id=\"activity-state-filter\" onchange=\"loadActivity()\"><option value=\"\">All states</option> <option value=\"submitted\">Submitted</option> <option value=\"working\">Working</option> <option value=\"completed\">Completed</option> <option value=\"failed\">Failed</option> <option value=\"canceled\">Canceled</option></select> <button class=\"btn btn-sm\" onclick=\"loadActivity()\">Refresh</button></div></div><p class=\"muted\" style=\"margin:0 0 12px\">Every ask through the control plane — who called, which agent, and the outcome. Admins see all; others see their own.</p><div id=\"activity-list\"></div></section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+func EventsTab() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var9 == nil {
+			templ_7745c5c3_Var9 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<section id=\"events-tab\"><div class=\"section-header\"><h2>Audit Events</h2><div class=\"filter-bar\"><select id=\"event-type-filter\" onchange=\"loadEventsTab()\"><option value=\"\">All events</option> <option value=\"agent:registered\">Agent Registered</option> <option value=\"agent:stale\">Agent Stale</option> <option value=\"agent:recovered\">Agent Recovered</option> <option value=\"agent:killed\">Agent Killed</option> <option value=\"log:batch\">Log Batch</option> <option value=\"registration:created\">Registration Created</option> <option value=\"registration:updated\">Registration Updated</option> <option value=\"connection:created\">Connection Created</option> <option value=\"connection:deleted\">Connection Deleted</option> <option value=\"template:created\">Profile Created</option> <option value=\"template:updated\">Profile Updated</option></select><div class=\"time-range-bar\" id=\"events-time-range\"><button class=\"active\" onclick=\"setEventsRange('1h', this)\">1h</button> <button onclick=\"setEventsRange('24h', this)\">24h</button> <button onclick=\"setEventsRange('168h', this)\">7d</button></div><button class=\"btn btn-sm\" onclick=\"loadEventsTab()\">Refresh</button></div></div><div id=\"events-list\"></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -257,12 +287,43 @@ func HumansTab() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
+		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var10 == nil {
+			templ_7745c5c3_Var10 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<section id=\"humans-tab\"><div class=\"tab-header\"><h2>Humans</h2><button class=\"btn btn-primary\" onclick=\"openCreateUserModal()\">+ New Human</button></div><div id=\"users-list\"></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<section id=\"humans-tab\"><div class=\"tab-header\"><h2>Humans</h2><button class=\"btn btn-primary\" onclick=\"openCreateUserModal()\">+ New Human</button></div><div id=\"users-list\"></div></section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// TeamsTab renders the human-group (team) management section. A team bundles
+// users; granting a team access to an agent or profile grants every member.
+func TeamsTab() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var11 == nil {
+			templ_7745c5c3_Var11 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<section id=\"teams-tab\"><div class=\"tab-header\"><h2>Teams</h2><button class=\"btn btn-primary\" onclick=\"openCreateTeamModal()\">+ New Team</button></div><p class=\"muted\" style=\"margin:0 0 12px\">A team groups people together. Grant a team access to an agent or profile (from its Access screen) and every member inherits it. Add members below.</p><div id=\"teams-list\"></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -287,12 +348,73 @@ func RolesTab() templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var10 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var10 == nil {
-			templ_7745c5c3_Var10 = templ.NopComponent
+		templ_7745c5c3_Var12 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var12 == nil {
+			templ_7745c5c3_Var12 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "<section id=\"roles-tab\"><div class=\"tab-header\"><h2>Roles</h2><button class=\"btn btn-primary\" onclick=\"openCreateRoleModal()\">+ New Role</button></div><div id=\"roles-list\"></div></section>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<section id=\"roles-tab\"><div class=\"tab-header\"><h2>Roles</h2><button class=\"btn btn-primary\" onclick=\"openCreateRoleModal()\">+ New Role</button></div><div id=\"roles-list\"></div></section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// TokensTab renders the calling user's personal access tokens (for CLI tools).
+func TokensTab() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var13 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var13 == nil {
+			templ_7745c5c3_Var13 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "<section id=\"tokens-tab\"><div class=\"tab-header\"><h2>Access Tokens</h2><button class=\"btn btn-primary\" onclick=\"openCreateTokenModal()\">+ New Token</button></div><p class=\"muted\" style=\"margin:0 0 12px\">Personal access tokens let CLI tools and scripts authenticate as you. A token value is shown only once, at creation.</p><div id=\"tokens-list\"></div></section>")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		return nil
+	})
+}
+
+// UploadsTab renders the calling user's attachment uploads. Files uploaded here
+// can be attached to agent messages by reference (clawmatrix://uploads/<id>).
+func UploadsTab() templ.Component {
+	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
+			return templ_7745c5c3_CtxErr
+		}
+		templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+		if !templ_7745c5c3_IsBuffer {
+			defer func() {
+				templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err == nil {
+					templ_7745c5c3_Err = templ_7745c5c3_BufErr
+				}
+			}()
+		}
+		ctx = templ.InitializeContext(ctx)
+		templ_7745c5c3_Var14 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var14 == nil {
+			templ_7745c5c3_Var14 = templ.NopComponent
+		}
+		ctx = templ.ClearChildren(ctx)
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<section id=\"uploads-tab\"><div class=\"tab-header\"><h2>Attachments</h2></div><p class=\"muted\" style=\"margin:0 0 12px\">Files you've attached to agent messages. Attach files from the chat composer (📎) — they show up here so you can review or delete them.</p><div id=\"uploads-list\"></div></section>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

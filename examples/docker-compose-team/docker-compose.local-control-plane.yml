@@ -1,0 +1,140 @@
+services:
+  ceo:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
+      - REGISTRATION_TOKEN=rt_ceo_demo_token_789
+      - AGENT_ID=ceo-id
+      - AGENT_GROUP=ceo
+      - AGENT_CMD=picoclaw agent
+      - RUNNER=picoclaw
+      - WEALTHYCLAW_CONFIG=/root/.picoclaw/config.json
+      - WORKSPACE_PATH=/workspace/ceo
+      - SESSION_URI=/workspace/ceo/sessions
+      - PICOCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/ceo
+      - PICOCLAW_AGENTS_DEFAULTS_MODEL=cloudflare-mistral-small-3.1-24b
+      - WEALTHYCLAW_AGENTS_DEFAULTS_WORKSPACE=/workspace/ceo
+      - WEALTHYCLAW_AGENTS_DEFAULTS_MODEL_NAME=cloudflare-mistral-small-3.1-24b
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_BASE=https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}/ai/v1
+      - CLOUDFLARE_API_TOKEN=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+      - HOST_URL=http://127.0.0.1:9090
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9090:8080"
+    volumes:
+      - ./agents/ceo:/workspace/ceo
+
+  marketing-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.adk
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
+      - REGISTRATION_TOKEN=rt_marketing_demo_token_123
+      - AGENT_ID=marketing-manager-id
+      - AGENT_GROUP=marketing-manager
+      - RUNNER=google-adk
+      - AGENT_TIMEOUT=10m
+      - WORKSPACE_PATH=/workspace/marketing-manager
+      - SESSION_URI=sqlite:////workspace/marketing-manager/sessions/adk_sessions.db
+      - GOOGLE_GENAI_USE_VERTEXAI=true
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-wealthy-prod-app-669}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
+      - ADK_MODEL=${ADK_MODEL:-@google/global/gemini-3-flash-preview}
+      - HOST_URL=http://127.0.0.1:9091
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9091:8080"
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+      - ./agents/marketing-manager:/workspace/marketing-manager
+
+  sales-manager:
+    build:
+      context: .
+      dockerfile: Dockerfile.adk
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
+      - REGISTRATION_TOKEN=rt_sales_demo_token_456
+      - AGENT_ID=sales-manager-id
+      - AGENT_GROUP=sales-manager
+      - RUNNER=google-adk
+      - AGENT_TIMEOUT=10m
+      - WORKSPACE_PATH=/workspace/sales-manager
+      - SESSION_URI=sqlite:////workspace/sales-manager/sessions/adk_sessions.db
+      - GOOGLE_GENAI_USE_VERTEXAI=true
+      - GOOGLE_CLOUD_PROJECT=${GOOGLE_CLOUD_PROJECT:-wealthy-prod-app-669}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION:-global}
+      - ADK_MODEL=${ADK_MODEL:-@google/global/gemini-3-flash-preview}
+      - HOST_URL=http://127.0.0.1:9092
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9092:8080"
+    volumes:
+      - ${HOME}/.config/gcloud:/root/.config/gcloud:ro
+      - ./agents/sales-manager:/workspace/sales-manager
+
+  tech-team:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
+    cap_add: [NET_RAW, NET_ADMIN]
+    user: root
+    environment:
+      - CONTROL_PLANE_URL=${HOST_CONTROL_PLANE_URL:-http://host.docker.internal:9999}
+      - REGISTRATION_TOKEN=rt_cto_demo_token_101
+      - AGENT_ID=cto-id
+      - RUNNER=openclaw
+      - HOST_URL=http://127.0.0.1:9093
+      - OPENCLAW_CONFIG=/root/.openclaw/openclaw.json
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+      - AGENT_TIMEOUT=10m
+      - AGENT_GATEWAY_URL=http://localhost:18789
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "9093:8080"
+    volumes:
+      - ./agents/cto/sessions:/root/.openclaw/agents/cto-id/sessions
+      - ./agents/techlead/sessions:/root/.openclaw/agents/techlead-id/sessions
+      - ./agents/cto:/workspace/cto
+      - ./agents/techlead:/workspace/techlead
+
+  tech-team-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.openclaw
+    network_mode: "service:tech-team"
+    depends_on:
+      tech-team:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:18789/__openclaw__/canvas/"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    environment:
+      - OPENCLAW_CONFIG=/root/.openclaw/openclaw.json
+      - CLOUDFLARE_ACCOUNT_ID=${CLOUDFLARE_ACCOUNT_ID:?set CLOUDFLARE_ACCOUNT_ID}
+      - CLOUDFLARE_API_KEY=${CLOUDFLARE_API_TOKEN:?set CLOUDFLARE_API_TOKEN}
+    command: ["openclaw", "gateway", "run"]
+    volumes:
+      - ./agents/cto/sessions:/root/.openclaw/agents/cto-id/sessions
+      - ./agents/techlead/sessions:/root/.openclaw/agents/techlead-id/sessions
+      - ./agents/cto:/workspace/cto
+      - ./agents/techlead:/workspace/techlead
+    restart: unless-stopped

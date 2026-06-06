@@ -31,11 +31,59 @@ type RolePermission struct {
 	Permission string `gorm:"primaryKey"`
 }
 
+// AgentProfileACL is the legacy per-profile, per-user grant table. It is kept
+// (dormant) for one release so a migration to AccessBinding can be rolled back;
+// new code reads and writes AccessBinding instead. Remove in a follow-up.
 type AgentProfileACL struct {
 	ProfileName string `gorm:"primaryKey"`
 	UserID      uint   `gorm:"primaryKey"`
 	RoleID      uint   `gorm:"not null;index"`
 	Role        Role   `gorm:"foreignKey:RoleID"`
+}
+
+// Principal types for AccessBinding.PrincipalType.
+const (
+	PrincipalUser  = "user"
+	PrincipalGroup = "group"
+)
+
+// Resource types for AccessBinding.ResourceType.
+const (
+	ResourceProfile = "profile" // ResourceID is the agent profile name
+	ResourceAgent   = "agent"   // ResourceID is the agent id
+)
+
+// AccessBinding grants a principal (a user or a group) a role on a resource (an
+// agent profile or a specific agent). It is the single source of truth for
+// resource-scoped access. Effective access for a user is the union of their own
+// bindings and the bindings of every group they belong to (see HumanGroupMember),
+// with agent-level grants layered additively on top of profile-level grants.
+type AccessBinding struct {
+	ID            uint   `gorm:"primaryKey"`
+	PrincipalType string `gorm:"uniqueIndex:idx_binding;not null;default:'user'"` // user | group
+	PrincipalID   uint   `gorm:"uniqueIndex:idx_binding;not null"`
+	ResourceType  string `gorm:"uniqueIndex:idx_binding;not null"`                // profile | agent
+	ResourceID    string `gorm:"uniqueIndex:idx_binding;not null"`                // profile name | agent id
+	RoleID        uint   `gorm:"not null;index"`
+	Role          Role   `gorm:"foreignKey:RoleID"`
+	CreatedAt     time.Time
+}
+
+// HumanGroup is a team of users. A group can be granted access (via AccessBinding
+// with PrincipalType=group); every member inherits those grants.
+type HumanGroup struct {
+	ID          uint   `gorm:"primaryKey"`
+	Name        string `gorm:"uniqueIndex;not null"`
+	Description string `gorm:"type:text;not null;default:''"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+}
+
+// HumanGroupMember links a user to a group.
+type HumanGroupMember struct {
+	GroupID  uint `gorm:"primaryKey"`
+	UserID   uint `gorm:"primaryKey"`
+	CreatedAt time.Time
 }
 
 type UserIdentity struct {
@@ -45,6 +93,31 @@ type UserIdentity struct {
 	ExternalID string `gorm:"uniqueIndex:idx_user_identity;not null"`
 }
 
+// UserToken is a personal access token (PAT) for non-interactive clients (CLI
+// tools and scripts). Only the hash is stored; the raw token is shown once at creation.
+type UserToken struct {
+	ID         uint   `gorm:"primaryKey"`
+	UserID     uint   `gorm:"index;not null"`
+	Name       string `gorm:"not null;default:''"` // human label, e.g. "somit's laptop"
+	TokenHash  string `gorm:"uniqueIndex;not null"`
+	LastUsedAt *time.Time
+	ExpiresAt  *time.Time // nil = never expires
+	CreatedAt  time.Time
+}
+
+// Upload is metadata for a stored attachment blob. The bytes live in the
+// configured storage backend (filesystem by default); only metadata is in the DB.
+type Upload struct {
+	ID        string `gorm:"primaryKey"` // opaque id, also the storage key
+	UserID    uint   `gorm:"index;not null"`
+	Name      string `gorm:"not null;default:''"`
+	MimeType  string `gorm:"not null;default:''"`
+	Size      int64  `gorm:"not null;default:0"`
+	Backend   string `gorm:"not null;default:'fs'"`
+	ExpiresAt *time.Time // nil = no expiry; set for TTL-based cleanup/GC
+	CreatedAt time.Time
+}
+
 type AcmeCache struct {
 	Key       string    `gorm:"primaryKey"`
 	Data      []byte    `gorm:"not null"`
@@ -52,16 +125,16 @@ type AcmeCache struct {
 }
 
 type Registration struct {
-	ID              uint   `gorm:"primaryKey"`
-	Name            string `gorm:"uniqueIndex;not null"`
-	Description     string `gorm:"type:text;not null;default:''"`
-	TokenHash       string `gorm:"uniqueIndex;not null"`
-	EgressAllowlist string `gorm:"type:text;not null;default:'[]'"` // JSON []string, supports wildcards
-	TTLMinutes      int    `gorm:"not null;default:-1"`
+	ID              uint       `gorm:"primaryKey"`
+	Name            string     `gorm:"uniqueIndex;not null"`
+	Description     string     `gorm:"type:text;not null;default:''"`
+	TokenHash       string     `gorm:"uniqueIndex;not null"`
+	EgressAllowlist string     `gorm:"type:text;not null;default:'[]'"` // JSON []string, supports wildcards
+	TTLMinutes      int        `gorm:"not null;default:-1"`
 	TotalRegistered int        `gorm:"not null;default:0"`
 	Archived        bool       `gorm:"not null;default:false"`
 	MonitorLastSeen *time.Time // last heartbeat from sniffer monitor
-	Labels          string `gorm:"type:text;not null;default:'{}'"` // JSON map[string]string
+	Labels          string     `gorm:"type:text;not null;default:'{}'"` // JSON map[string]string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -105,6 +178,34 @@ type Agent struct {
 	StatsReqCount int64     `gorm:"not null;default:0"`
 	RegisteredAt  time.Time `gorm:"not null"`
 	LastHeartbeat time.Time `gorm:"not null"`
+}
+
+type A2ATask struct {
+	ID              string `gorm:"primaryKey"`
+	Kind            string `gorm:"not null;default:'task'"`
+	ContextID       string `gorm:"index;not null"`
+	RuntimeSession  string
+	RuntimeRunner   string
+	StatusState     string `gorm:"index;not null"`
+	StatusMessage   string `gorm:"type:text;not null;default:'{}'"`
+	StatusTimestamp time.Time
+	History         string `gorm:"type:text;not null;default:'[]'"`
+	Artifacts       string `gorm:"type:text;not null;default:'[]'"`
+	Metadata        string `gorm:"type:text;not null;default:'{}'"`
+	SourceAgentID   string `gorm:"index"`
+	SourceProfile   string `gorm:"index"`
+	TargetAgentID   string `gorm:"index"`
+	TargetProfile   string `gorm:"index"`
+	// Caller attribution — who initiated this ask (distinct from SourceProfile,
+	// which overloads the agent-profile namespace). Set for every ask.
+	CallerKind   string `gorm:"index"` // user | agent | registration
+	CallerUserID uint   `gorm:"index"` // User.ID for user/PAT asks; 0 otherwise
+	CallerName   string `gorm:"index"` // username, profile, or registration name (display)
+	// ParentTaskID links this hop to the ask that triggered it (agent→agent
+	// delegation). Empty = a root ask. Captured at delegation time by clutch.
+	ParentTaskID string `gorm:"index"`
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type RequestLog struct {

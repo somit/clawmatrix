@@ -208,42 +208,119 @@ async function deleteAgentTemplate(name) {
   }
 }
 
-// --- Profile ACL Modal ---
+// --- Per-principal access summary (read-only) ---
+// Shows every resource a human or team can reach, in one place.
+
+function renderAccessSummary(title, subtitle, entries) {
+  const rows = entries.length
+    ? `<table class="data-table" style="margin-top:4px">
+         <thead><tr><th>Resource</th><th>Role</th><th>Granted via</th></tr></thead>
+         <tbody>
+           ${entries.map(e => {
+             const kind = e.resource_type === 'agent' ? 'agent' : 'profile';
+             const src = e.source === 'direct'
+               ? '<span class="pill">direct</span>'
+               : `<span class="pill pill-team">${esc(e.source.replace(/^team:/, '🧑‍🤝‍🧑 '))}</span>`;
+             return `<tr>
+               <td><span class="muted">${kind}</span> ${esc(e.resource_id)}</td>
+               <td><span class="pill">${esc(e.role_name)}</span></td>
+               <td>${src}</td>
+             </tr>`;
+           }).join('')}
+         </tbody>
+       </table>`
+    : '<p class="muted" style="font-size:13px">No access granted yet.</p>';
+
+  document.getElementById('modal-root').innerHTML = `
+    <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
+      <div class="modal modal-wide" onclick="event.stopPropagation()">
+        <h3>${esc(title)}</h3>
+        ${subtitle ? `<p class="muted" style="font-size:12px;margin:0 0 8px">${esc(subtitle)}</p>` : ''}
+        ${rows}
+        <div class="modal-actions">
+          <button class="btn" onclick="closeModal()">Done</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+async function showHumanAccessModal(userId, username) {
+  const entries = await api('GET', `/users/${userId}/access`).catch(() => []);
+  renderAccessSummary(`Access — ${username}`, 'Everything this person can reach, directly or through their teams.', entries || []);
+}
+
+async function showTeamAccessModal(groupId, name) {
+  const entries = await api('GET', `/groups/${groupId}/access`).catch(() => []);
+  renderAccessSummary(`Access — team ${name}`, 'Every member of this team inherits the grants below.', entries || []);
+}
+
+// --- Access (ACL) Modal ---
+// Generic over the resource: a profile (/agent-profiles/{name}/acl) or a single
+// agent (/agents/{id}/acl). Grantees can be a user or a team (group).
+
+function aclBasePath(kind, id) {
+  return kind === 'agent'
+    ? `/agents/${encodeURIComponent(id)}/acl`
+    : `/agent-profiles/${encodeURIComponent(id)}/acl`;
+}
 
 async function showProfileACLModal(profileName) {
-  const [acl, users, roles] = await Promise.all([
-    api('GET', `/agent-profiles/${encodeURIComponent(profileName)}/acl`).catch(() => []),
+  return showACLModal('profile', profileName, profileName);
+}
+
+async function showAgentACLModal(agentId) {
+  return showACLModal('agent', agentId, agentId);
+}
+
+async function showACLModal(kind, id, label) {
+  const [acl, users, groups, roles] = await Promise.all([
+    api('GET', aclBasePath(kind, id)).catch(() => []),
     api('GET', '/users').catch(() => []),
+    api('GET', '/groups').catch(() => []),
     api('GET', '/roles').catch(() => []),
   ]);
   const profileRoles = (roles || []).filter(r => r.Scope === 'profile');
-  renderProfileACLModal(profileName, acl || [], users || [], profileRoles);
+  renderACLModal(kind, id, label, acl || [], users || [], groups || [], profileRoles);
 }
 
-function renderProfileACLModal(profileName, acl, users, roles) {
-  const userMap = Object.fromEntries((users || []).map(u => [u.id, u.username]));
+function renderACLModal(kind, id, label, acl, users, groups, roles) {
   const aclRows = acl.length
-    ? acl.map(entry => `
+    ? acl.map(entry => {
+        const isGroup = entry.principal_type === 'group';
+        const name = entry.principal_label || `${entry.principal_type} #${entry.principal_id}`;
+        const tag = isGroup ? '<span class="pill pill-team">team</span> ' : '';
+        return `
         <div class="acl-row">
-          <span>${esc(userMap[entry.UserID] || 'user #' + entry.UserID)}</span>
-          <span class="pill">${esc(entry.Role?.Name || 'role #' + entry.RoleID)}</span>
-          <button class="btn btn-sm btn-danger" onclick="removeProfileACL('${esc(profileName)}', ${entry.UserID}, this)">Remove</button>
-        </div>`)
-      .join('')
+          <span>${tag}${esc(name)}</span>
+          <span class="pill">${esc(entry.role_name || 'role #' + entry.role_id)}</span>
+          <button class="btn btn-sm btn-danger" onclick="removeACL('${kind}','${esc(id)}','${esc(entry.principal_type)}',${entry.principal_id}, this)">Remove</button>
+        </div>`;
+      }).join('')
     : '<p class="muted" style="font-size:13px">No access entries yet.</p>';
 
-  const userOptions = users.map(u => `<option value="${u.id}">${esc(u.username)}</option>`).join('');
+  const userOptions = users.map(u => `<option value="user:${u.id}">${esc(u.username)}</option>`).join('');
+  const groupOptions = groups.map(g => `<option value="group:${g.id}">${esc(g.name)} (team)</option>`).join('');
+  const granteeOptions = [
+    userOptions ? `<optgroup label="Users">${userOptions}</optgroup>` : '',
+    groupOptions ? `<optgroup label="Teams">${groupOptions}</optgroup>` : '',
+  ].join('');
   const roleOptions = roles.map(r => `<option value="${r.ID}">${esc(r.Name)}</option>`).join('');
+
+  const title = kind === 'agent' ? `Access — agent ${esc(label)}` : `Access — ${esc(label)}`;
+  const hint = kind === 'agent'
+    ? '<p class="muted" style="font-size:12px">Grants here apply to this agent only, in addition to any access inherited from its profile.</p>'
+    : '';
 
   document.getElementById('modal-root').innerHTML = `
     <div class="modal-overlay" onclick="if(event.target===this)closeModal()">
       <div class="modal" onclick="event.stopPropagation()">
-        <h3>Access — ${esc(profileName)}</h3>
+        <h3>${title}</h3>
+        ${hint}
         <div class="acl-list" id="acl-list">${aclRows}</div>
         <div class="acl-add-row">
-          <select id="acl-user">${userOptions}</select>
+          <select id="acl-grantee">${granteeOptions}</select>
           <select id="acl-role">${roleOptions}</select>
-          <button class="btn btn-sm btn-primary" onclick="addProfileACL('${esc(profileName)}')">Add</button>
+          <button class="btn btn-sm btn-primary" onclick="addACL('${kind}','${esc(id)}')">Add</button>
         </div>
         <div class="modal-error" id="m-error"></div>
         <div class="modal-actions">
@@ -253,24 +330,28 @@ function renderProfileACLModal(profileName, acl, users, roles) {
     </div>`;
 }
 
-async function addProfileACL(profileName) {
-  const userId = parseInt(document.getElementById('acl-user').value);
+async function addACL(kind, id) {
+  const grantee = document.getElementById('acl-grantee').value; // "user:3" | "group:1"
   const roleId = parseInt(document.getElementById('acl-role').value);
   const err = document.getElementById('m-error');
+  if (!grantee) { err.textContent = 'select a user or team'; return; }
+  const [ptype, pid] = grantee.split(':');
   try {
-    await api('POST', `/agent-profiles/${encodeURIComponent(profileName)}/acl`, { user_id: userId, role_id: roleId });
-    await showProfileACLModal(profileName);
+    await api('POST', aclBasePath(kind, id), {
+      principal_type: ptype, principal_id: parseInt(pid), role_id: roleId,
+    });
+    await showACLModal(kind, id, id);
   } catch(e) {
     err.textContent = e.message;
   }
 }
 
-async function removeProfileACL(profileName, userId, btn) {
+async function removeACL(kind, id, ptype, pid, btn) {
   btn.disabled = true;
   const err = document.getElementById('m-error');
   try {
-    await api('DELETE', `/agent-profiles/${encodeURIComponent(profileName)}/acl/${userId}`);
-    await showProfileACLModal(profileName);
+    await api('DELETE', `${aclBasePath(kind, id)}/${encodeURIComponent(ptype)}/${pid}`);
+    await showACLModal(kind, id, id);
   } catch(e) {
     err.textContent = e.message;
     btn.disabled = false;

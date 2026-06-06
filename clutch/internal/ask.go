@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -16,6 +15,7 @@ type AskRequest struct {
 	Message string `json:"message"`
 	Session string `json:"session"`
 	Timeout int    `json:"timeout"`
+	TaskID  string `json:"taskId"` // CP task this run serves; used to link delegations
 }
 
 type AskResponse struct {
@@ -56,6 +56,13 @@ func handleAskForAgent(w http.ResponseWriter, r *http.Request, agent *Registered
 		session = "cli:default"
 	}
 
+	// Stash the task this agent is serving so any delegation it makes mid-run can
+	// be linked back as a child. Cleared when the run returns.
+	if req.TaskID != "" {
+		agentServingTask.Store(agent.id, req.TaskID)
+		defer agentServingTask.Delete(agent.id)
+	}
+
 	timeout := AgentTimeout
 	if req.Timeout > 0 {
 		timeout = time.Duration(req.Timeout) * time.Second
@@ -71,9 +78,10 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 		return
 	}
 
-	runner := newRunner()
-	runner.PrepareSession(agent, session)
-	parts := runner.CommandArgs(agent, msg, session)
+	runner := getRunner()
+	agentView := runnerAgent(agent)
+	runner.PrepareSession(agentView, session)
+	parts := runner.CommandArgs(agentView, msg, session)
 
 	// Serialize per-agent to prevent concurrent session file conflicts.
 	agent.mu.Lock()
@@ -142,42 +150,18 @@ func runSubprocess(w http.ResponseWriter, r *http.Request, agent *RegisteredAgen
 }
 
 // LocalDelegateAsk runs a local agent's command for same-instance delegation.
-func LocalDelegateAsk(w http.ResponseWriter, r *http.Request, agent *RegisteredAgent) {
-	var req AskRequest
-	if r.Body != nil {
-		defer r.Body.Close()
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			WriteJSON(w, 400, map[string]string{"error": "invalid JSON"})
-			return
-		}
-	}
-
-	msg := strings.TrimSpace(req.Message)
+// The message/session are passed in already-parsed — handleDelegate has consumed
+// the request body, so re-reading it here would fail.
+func LocalDelegateAsk(w http.ResponseWriter, agent *RegisteredAgent, message, session string) {
+	msg := strings.TrimSpace(message)
 	if msg == "" {
 		WriteJSON(w, 400, map[string]string{"error": "message required"})
 		return
 	}
 
-	fakeBody, _ := json.Marshal(req)
+	fakeBody, _ := json.Marshal(AskRequest{Message: message, Session: session})
 	fakeReq, _ := http.NewRequest("POST", "/ask/"+agent.id, bytes.NewReader(fakeBody))
 	fakeReq.Header.Set("Content-Type", "application/json")
 
 	handleAskForAgent(w, fakeReq, agent)
-}
-
-// --- shared helpers ---
-
-// splitFields splits a command string into args (like strings.Fields).
-func splitFields(s string) []string {
-	return strings.Fields(s)
-}
-
-// envAll returns a copy of os.Environ() (used by runners that need the full env).
-func envAll() []string {
-	return append([]string(nil), os.Environ()...)
-}
-
-// trimSpace trims leading/trailing whitespace.
-func trimSpace(s string) string {
-	return strings.TrimSpace(s)
 }

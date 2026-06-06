@@ -1,0 +1,26 @@
+# Docker Compose Team Test Cases
+
+- Control plane login works with `admin/admin`.
+- All five agents register and show healthy: `ceo`, `marketing-manager`, `sales-manager`, `cto`, `techlead`.
+- `marketing-manager` chat works through Clutch using `RUNNER=google-adk`.
+- `sales-manager` chat works through Clutch using `RUNNER=google-adk`.
+- ADK runner uses `adk run` directly without `agent_cli.py`.
+- ADK sessions are stored in each agent workspace SQLite DB under `agents/<agent>/sessions/adk_sessions.db`.
+- ADK session list shows clean names like `<session>.json`.
+- ADK session read returns user and assistant messages from SQLite.
+- `marketing-manager` can list authorized ClawMatrix peers using `list_clawmatrix_agents`.
+- `marketing-manager` can delegate to `sales-manager` using `delegate_to_clawmatrix_agent`.
+- Unauthorized ADK delegation reports the current ClawMatrix connection graph blocks the handoff.
+- `cto` chat works through Clutch using `RUNNER=openclaw`.
+- `techlead` chat works through Clutch using `RUNNER=openclaw`.
+- OpenClaw CTO sessions are written under `agents/cto/sessions`.
+- OpenClaw techlead sessions are written under `agents/techlead/sessions`.
+- OpenClaw sessions are visible in the UI session list.
+- `ceo` chat works through Clutch using `RUNNER=picoclaw`.
+- `ceo` can reach `cto`, `marketing-manager`, and `sales-manager` according to bootstrap connections.
+- `cto` can reach `techlead` according to OpenClaw config discovery.
+- `sales-manager` can reach `marketing-manager` according to bootstrap connections.
+- ADK compose services do not define `AGENT_CMD`, `ADK_AGENT_MODULE`, `ADK_AGENT_DIR`, `ADK_SESSION_APP_NAME`, or `ADK_SESSION_USER_ID`.
+- ADK compose services keep `AGENT_ID`, `AGENT_GROUP`, `WORKSPACE_PATH`, `SESSION_URI`, `RUNNER=google-adk`, and Cloudflare model envs.
+- `clutch` Go tests pass with `go test ./...`.
+- ADK Python files compile with `python3 -m py_compile`.

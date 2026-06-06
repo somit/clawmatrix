@@ -28,12 +28,16 @@ templ Nav() {
 		<button onclick="showTab('registrations', this)">Registrations</button>
 		<button onclick="showTab('templates', this)">Profiles</button>
 		<button onclick="showTab('connections', this)">Connections</button>
+		<button onclick="showTab('uploads', this)">Attachments</button>
 		<button onclick="showTab('logs', this)">Network Logs</button>
 		<button onclick="showTab('crons', this)">Crons</button>
+		<button onclick="showTab('activity', this)">Activity</button>
 		<button onclick="showTab('events', this)">Events</button>
 		<div class="sidebar-divider"></div>
 		<button onclick="showTab('humans', this)">Humans</button>
+		<button onclick="showTab('teams', this)">Teams</button>
 		<button onclick="showTab('roles', this)">Roles</button>
+		<button onclick="showTab('tokens', this)">Access Tokens</button>
 	</nav>
 }
 
@@ -48,9 +52,13 @@ templ Main() {
 			@ConnectionsTab()
 			@LogsTab()
 			@CronsTab()
+			@ActivityTab()
 			@EventsTab()
 		@HumansTab()
+		@TeamsTab()
 		@RolesTab()
+		@TokensTab()
+		@UploadsTab()
 		</div>
 	</main>
 }

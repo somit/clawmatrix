@@ -24,6 +24,10 @@ type Assets struct {
 	WorkspaceJS     string
 	SessionsJS      string
 	UsersJS         string
+	TeamsJS         string
+	TokensJS        string
+	UploadsJS       string
+	ActivityJS      string
 }
 
 func computeAssets(fs embed.FS) Assets {
@@ -55,5 +59,9 @@ func computeAssets(fs embed.FS) Assets {
 		WorkspaceJS:     v("js/workspace.js"),
 		SessionsJS:      v("js/sessions.js"),
 		UsersJS:         v("js/users.js"),
+		TeamsJS:         v("js/teams.js"),
+		TokensJS:        v("js/tokens.js"),
+		UploadsJS:       v("js/uploads.js"),
+		ActivityJS:      v("js/activity.js"),
 	}
 }

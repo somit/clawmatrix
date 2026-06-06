@@ -6,6 +6,7 @@ let chatMessages = []; // {role, text, ts, thinking}
 let chatBusy = false;
 let chatAbortController = null;
 let chatQueue = []; // queued messages typed while busy
+let chatPendingAttachments = []; // [{id, uri, name}] uploaded, not yet sent
 
 function openChat(agentId, templateName) {
   chatAgentId = agentId;
@@ -14,6 +15,7 @@ function openChat(agentId, templateName) {
   chatBusy = false;
   chatAbortController = null;
   chatQueue = [];
+  chatPendingAttachments = [];
   const root = document.getElementById('chat-root');
   root.innerHTML = `
     <div class="chat-overlay" onclick="closeChat()"></div>
@@ -25,7 +27,10 @@ function openChat(agentId, templateName) {
       <div class="chat-messages" id="chat-messages">
         <div style="text-align:center;color:var(--muted);font-size:12px;padding:20px">Send a message to ${esc(templateName)} agent</div>
       </div>
+      <div class="chat-attachments" id="chat-attachments" style="display:none"></div>
       <div class="chat-input-bar">
+        <input type="file" id="chat-file" style="display:none" onchange="chatOnFilePicked(this)" />
+        <button id="chat-attach" class="chat-attach-btn" title="Attach a file" onclick="document.getElementById('chat-file').click()">📎</button>
         <textarea id="chat-input" rows="1" placeholder="Type a message... (Enter to send, Shift+Enter for newline)"
           onkeydown="chatInputKeydown(event)" oninput="chatInputResize(this)"></textarea>
         <button id="chat-send" onclick="chatSendOrStop()">Send</button>
@@ -34,6 +39,44 @@ function openChat(agentId, templateName) {
     </div>
   `;
   document.getElementById('chat-input').focus();
+}
+
+// Upload the picked file immediately; it rides along with the next sent message.
+async function chatOnFilePicked(input) {
+  if (!input.files || !input.files.length) return;
+  const file = input.files[0];
+  input.value = ''; // allow re-picking same file
+  const attachBtn = document.getElementById('chat-attach');
+  if (attachBtn) { attachBtn.disabled = true; attachBtn.textContent = '…'; }
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const resp = await fetch('/uploads', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: fd });
+    if (resp.status === 401) { doLogout(); return; }
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || resp.statusText);
+    chatPendingAttachments.push({ id: data.id, uri: data.uri, name: data.name });
+    renderChatAttachments();
+  } catch(e) {
+    alert('Upload failed: ' + e.message);
+  } finally {
+    if (attachBtn) { attachBtn.disabled = false; attachBtn.textContent = '📎'; }
+  }
+}
+
+function renderChatAttachments() {
+  const el = document.getElementById('chat-attachments');
+  if (!el) return;
+  if (!chatPendingAttachments.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+  el.style.display = 'flex';
+  el.innerHTML = chatPendingAttachments.map((a, i) =>
+    `<span class="chat-attachment-chip">📎 ${esc(a.name)} <button onclick="chatRemoveAttachment(${i})" title="Remove">×</button></span>`
+  ).join('');
+}
+
+function chatRemoveAttachment(i) {
+  chatPendingAttachments.splice(i, 1);
+  renderChatAttachments();
 }
 
 function closeChat() {
@@ -67,10 +110,13 @@ function chatSendOrStop() {
   }
   const input = document.getElementById('chat-input');
   const message = input.value.trim();
-  if (!message || !chatAgentId) return;
+  if ((!message && !chatPendingAttachments.length) || !chatAgentId) return;
+  const attachments = chatPendingAttachments.map(a => ({ uri: a.uri, name: a.name }));
+  chatPendingAttachments = [];
+  renderChatAttachments();
   input.value = '';
   input.style.height = 'auto';
-  execChatMessage(message);
+  execChatMessage(message, attachments);
 }
 
 function chatEnqueue(message) {
@@ -108,7 +154,8 @@ function chatTimestamp() {
   return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-async function execChatMessage(message) {
+async function execChatMessage(message, attachments) {
+  attachments = attachments || [];
   chatBusy = true;
   updateSendBtn();
 
@@ -129,7 +176,10 @@ async function execChatMessage(message) {
     };
   }
 
-  chatMessages.push({ role: 'user', text: message, ts: chatTimestamp() });
+  const userText = attachments.length
+    ? (message ? message + '\n' : '') + attachments.map(a => '📎 ' + a.name).join('\n')
+    : message;
+  chatMessages.push({ role: 'user', text: userText, ts: chatTimestamp() });
   renderChatMessages();
 
   const agentMsgIdx = chatMessages.length;
@@ -142,7 +192,7 @@ async function execChatMessage(message) {
     const resp = await fetch('/agents/' + encodeURIComponent(chatAgentId) + '/chat', {
       method: 'POST',
       headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, session: 'autobot-manager-default-chat' }),
+      body: JSON.stringify({ message, session: 'autobot-manager-default-chat', attachments }),
       signal: chatAbortController.signal,
     });
 

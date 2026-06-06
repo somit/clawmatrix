@@ -1,6 +1,7 @@
 package clutch
 
 import (
+	"clutch/internal/runners"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -8,7 +9,8 @@ import (
 
 // RegisteredAgent holds per-agent state for multi-agent support.
 type RegisteredAgent struct {
-	id                string // local id: "cto", "mflead"
+	id                string // local id: "cto-id", "techlead-id"
+	group             string // profile/group name used as a delegation target: "cto", "techlead"
 	fullID            string // CP id: "cto-cto", "mflead-mflead"
 	agentToken        string // per-agent auth token from CP
 	registrationToken string // registration token (for heartbeats/config); empty for primary
@@ -42,6 +44,7 @@ var (
 
 	PreferredAgentID    string
 	PreferredAgentGroup string // role/group name (AGENT_GROUP env), defaults to agent id
+	AgentDescription    string // capability summary (AGENT_DESCRIPTION env) declared to the directory for discovery
 
 	AgentCmd     string // e.g. "picoclaw agent"
 	AgentTimeout time.Duration
@@ -51,9 +54,10 @@ var (
 	LogAllowed bool
 	LogBlocked bool
 
-	Runner        string
-	WorkspacePath string
-	SessionsPath  string
+	Runner         string
+	RunnerInstance runners.Runner
+	WorkspacePath  string
+	SessionsPath   string
 
 	// Gateway forwarding for openclaw runner
 	AgentGatewayURL   string // e.g. "http://localhost:18789"
@@ -62,6 +66,16 @@ var (
 
 	LogBuf   []map[string]any
 	LogBufMu sync.Mutex
+
+	// ActivityBuf batches local (same-clutch) delegation hops reported to the
+	// control plane so they appear in the trace/activity view.
+	ActivityBuf   []map[string]any
+	ActivityBufMu sync.Mutex
+
+	// agentServingTask maps an agent's local id → the CP task id it is currently
+	// serving, so a delegation made mid-run links back to its parent task.
+	// Reliable because clutch serializes one ask per agent.
+	agentServingTask sync.Map
 
 	// Multi-agent state
 	RegisteredAgents   []RegisteredAgent

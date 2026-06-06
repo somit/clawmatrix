@@ -80,17 +80,36 @@ func runCLI() {
 		os.Exit(0)
 
 	case "delegate":
-		if len(args) < 3 {
-			fmt.Fprintln(os.Stderr, `usage: clutch [--name <agent>] delegate <agent> "<message>" [session]`)
+		async := false
+		delegateArgs := args[1:]
+		if len(delegateArgs) > 0 && delegateArgs[0] == "--async" {
+			async = true
+			delegateArgs = delegateArgs[1:]
+		}
+		if len(delegateArgs) < 2 {
+			fmt.Fprintln(os.Stderr, `usage: clutch [--name <agent>] delegate [--async] <agent> "<message>" [session]`)
 			os.Exit(1)
 		}
-		target, message := args[1], args[2]
-		payload := map[string]string{"message": message}
-		if len(args) > 3 {
-			payload["session"] = args[3]
+		target, message := delegateArgs[0], delegateArgs[1]
+		payload := map[string]any{"message": message}
+		if async {
+			payload["async"] = true
+		}
+		if len(delegateArgs) > 2 {
+			payload["session"] = delegateArgs[2]
 		}
 		body, _ := json.Marshal(payload)
 		cliPost("/delegate/"+target, string(body))
+		os.Exit(0)
+
+	case "tasks", "poll":
+		// Poll an async delegation: `clutch tasks <id>` shows one task,
+		// `clutch tasks` lists this agent's recent tasks.
+		if len(args) >= 2 && args[1] != "" {
+			cliGet("/tasks/" + args[1])
+		} else {
+			cliGet("/tasks")
+		}
 		os.Exit(0)
 
 	case "crons":
@@ -135,7 +154,7 @@ func main() {
 	agentTimeoutFlag := flag.Duration("agent-timeout", 120*time.Second, "timeout for agent subprocess (or AGENT_TIMEOUT env)")
 	runnerFlag := flag.String("runner", "", "runner type, e.g. 'picoclaw' or 'openclaw' (or RUNNER env)")
 	workspaceFlag := flag.String("workspace", "", "workspace directory for /workspace endpoint (or WORKSPACE_PATH env)")
-	sessionsFlag := flag.String("sessions", "", "sessions directory for /sessions endpoint (or SESSIONS_PATH env)")
+	sessionURIFlag := flag.String("session-uri", "", "session store URI/path for /sessions endpoint (or SESSION_URI env)")
 	agentGatewayFlag := flag.String("agent-gateway", "", "agent gateway URL for openclaw HTTP forwarding (or AGENT_GATEWAY_URL env)")
 	agentGatewayTokenFlag := flag.String("agent-gateway-token", "", "bearer token for agent gateway auth (or AGENT_GATEWAY_TOKEN env)")
 	noSnifferFlag := flag.Bool("no-sniffer", false, "disable sniffer goroutine (or DISABLE_SNIFFER env)")
@@ -157,6 +176,7 @@ func main() {
 	}
 	clutch.PreferredAgentID = *preferredID
 	clutch.PreferredAgentGroup = os.Getenv("AGENT_GROUP")
+	clutch.AgentDescription = os.Getenv("AGENT_DESCRIPTION")
 
 	clutch.AgentCmd = *agentCmdFlag
 	if clutch.AgentCmd == "" {
@@ -176,9 +196,9 @@ func main() {
 	if clutch.WorkspacePath == "" {
 		clutch.WorkspacePath = os.Getenv("WORKSPACE_PATH")
 	}
-	clutch.SessionsPath = *sessionsFlag
+	clutch.SessionsPath = *sessionURIFlag
 	if clutch.SessionsPath == "" {
-		clutch.SessionsPath = os.Getenv("SESSIONS_PATH")
+		clutch.SessionsPath = os.Getenv("SESSION_URI")
 	}
 	clutch.AgentGatewayURL = *agentGatewayFlag
 	if clutch.AgentGatewayURL == "" {
@@ -192,6 +212,7 @@ func main() {
 	if !clutch.SnifferDisabled {
 		clutch.SnifferDisabled = os.Getenv("DISABLE_SNIFFER") == "true"
 	}
+	clutch.InitRunner()
 
 	clutch.ListenAddr = *listen
 	clutch.HostBaseURL = os.Getenv("HOST_URL")
@@ -233,6 +254,7 @@ func main() {
 		go clutch.HeartbeatLoop()
 		go clutch.ConfigPollLoop()
 		go clutch.LogFlushLoop()
+		go clutch.ActivityFlushLoop()
 	}
 
 	// Start sniffer goroutine (Linux only, skipped if disabled or no caps)

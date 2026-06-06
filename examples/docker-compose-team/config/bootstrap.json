@@ -3,25 +3,25 @@
     {
       "name": "picoclaw-ceo-office",
       "token": "rt_ceo_demo_token_789",
-      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "allowlist": ["host.docker.internal", "0.250.250.254", "api.cloudflare.com", "*.cloudflare.com", "*.duckduckgo.com"],
       "ttlMinutes": -1
     },
     {
-      "name": "picoclaw-marketing",
+      "name": "adk-marketing",
       "token": "rt_marketing_demo_token_123",
-      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "allowlist": ["host.docker.internal", "0.250.250.254", "api.cloudflare.com", "*.cloudflare.com", "*.duckduckgo.com", "*.googleapis.com"],
       "ttlMinutes": -1
     },
     {
-      "name": "picoclaw-sales",
+      "name": "adk-sales",
       "token": "rt_sales_demo_token_456",
-      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com"],
+      "allowlist": ["host.docker.internal", "0.250.250.254", "api.cloudflare.com", "*.cloudflare.com", "*.duckduckgo.com", "*.googleapis.com"],
       "ttlMinutes": -1
     },
     {
       "name": "openclaw-tech-team",
       "token": "rt_cto_demo_token_101",
-      "allowlist": ["host.docker.internal", "*.googleapis.com", "*.anthropic.com", "*.duckduckgo.com", "*.aws.amazon.com", "aws.amazon.com", "instances.vantage.sh", "*.vantage.sh"],
+      "allowlist": ["host.docker.internal", "0.250.250.254", "api.cloudflare.com", "*.cloudflare.com", "*.duckduckgo.com", "*.aws.amazon.com", "aws.amazon.com", "instances.vantage.sh", "*.vantage.sh"],
       "ttlMinutes": -1
     }
   ],
@@ -29,6 +29,8 @@
     { "source": "ceo", "target": "cto" },
     { "source": "ceo", "target": "marketing-manager" },
     { "source": "ceo", "target": "sales-manager" },
+    { "source": "sales-manager", "target": "marketing-manager" },
+    { "source": "marketing-manager", "target": "sales-manager" },
     { "source": "cto", "target": "techlead" }
   ]
 }

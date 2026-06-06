@@ -18,12 +18,26 @@ func CpDoWithToken(method, path string, body any, token string) (*http.Response,
 	return cpDoWithTokenAndTimeout(method, path, body, token, 10*time.Second)
 }
 
+// CpDoWithHeaders is like CpDo but lets the caller pass extra request headers
+// (e.g. X-Clutch-Agent) using the registration token and the default timeout.
+func CpDoWithHeaders(method, path string, body any, headers map[string]string) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, CpToken, headers, 10*time.Second)
+}
+
 // CpDoLong is like CpDo but with a long timeout for agent chat/delegate calls.
 func CpDoLong(method, path string, body any) (*http.Response, error) {
 	return cpDoWithTokenAndTimeout(method, path, body, CpToken, 5*time.Minute)
 }
 
+func CpDoLongWithHeaders(method, path string, body any, headers map[string]string) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, CpToken, headers, 45*time.Minute)
+}
+
 func cpDoWithTokenAndTimeout(method, path string, body any, token string, timeout time.Duration) (*http.Response, error) {
+	return cpDoWithTokenHeadersAndTimeout(method, path, body, token, nil, timeout)
+}
+
+func cpDoWithTokenHeadersAndTimeout(method, path string, body any, token string, headers map[string]string, timeout time.Duration) (*http.Response, error) {
 	var r io.Reader
 	if body != nil {
 		b, _ := json.Marshal(body)
@@ -36,6 +50,11 @@ func cpDoWithTokenAndTimeout(method, path string, body any, token string, timeou
 	req.Header.Set("Authorization", "Bearer "+token)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	for k, v := range headers {
+		if v != "" {
+			req.Header.Set(k, v)
+		}
 	}
 	return (&http.Client{Timeout: timeout}).Do(req)
 }

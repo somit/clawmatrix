@@ -1,6 +1,9 @@
 package config
 
-import "os"
+import (
+	"os"
+	"strings"
+)
 
 type Config struct {
 	JWTSecret       string
@@ -17,6 +20,11 @@ type Config struct {
 	OIDCClientSecret    string
 	OIDCRedirectBaseURL string // e.g. "https://cp.example.com" (no trailing slash)
 	OIDCProvider        string // google | github | microsoft | okta | keycloak | custom
+	// Attachments / uploads
+	UploadBackend string // fs (default) | gcs | s3 | r2
+	UploadDir     string // filesystem backend storage dir
+	UploadBucket  string // bucket name for gcs/s3/r2 backends
+	PublicBaseURL string // externally-reachable CP base URL for signed file links (no trailing slash)
 }
 
 func Load() *Config {
@@ -45,6 +53,10 @@ func Load() *Config {
 		OIDCClientSecret:    os.Getenv("OIDC_CLIENT_SECRET"),
 		OIDCRedirectBaseURL: os.Getenv("OIDC_REDIRECT_BASE_URL"),
 		OIDCProvider:        envOr("OIDC_PROVIDER", "custom"),
+		UploadBackend:       envOr("UPLOAD_BACKEND", "fs"),
+		UploadDir:           envOr("UPLOAD_DIR", "/data/uploads"),
+		UploadBucket:        os.Getenv("UPLOAD_BUCKET"),
+		PublicBaseURL:       strings.TrimRight(os.Getenv("PUBLIC_BASE_URL"), "/"),
 	}
 }
 

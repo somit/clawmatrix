@@ -23,12 +23,12 @@ func CreateRegistration(name, description, token string, allowlist []string, lab
 		lb = []byte("{}")
 	}
 	t := &Registration{
-		Name:        name,
-		Description: description,
-		TokenHash:   HashToken(token),
+		Name:            name,
+		Description:     description,
+		TokenHash:       HashToken(token),
 		EgressAllowlist: string(al),
-		Labels:      string(lb),
-		TTLMinutes:  ttlMinutes,
+		Labels:          string(lb),
+		TTLMinutes:      ttlMinutes,
 	}
 	return t, DB.Create(t).Error
 }
@@ -42,7 +42,6 @@ func GetRegistrationByToken(token string) (*Registration, error) {
 	var t Registration
 	return &t, DB.Where("token_hash = ?", HashToken(token)).First(&t).Error
 }
-
 
 func ListRegistrations() ([]Registration, error) {
 	var regs []Registration
@@ -123,18 +122,24 @@ func CreateAgentProfile(name, description, image, deploymentConfig, source strin
 	return t, DB.Create(t).Error
 }
 
-// UpsertAgentProfile creates the profile if it doesn't exist, or updates source if it does.
-func UpsertAgentProfile(name, registrationName, source string) (*AgentProfile, error) {
+// UpsertAgentProfile creates the profile if it doesn't exist, or updates source
+// (and description, when the agent declares one) if it does. An empty description
+// never overwrites an existing one, so re-registration without it is non-destructive.
+func UpsertAgentProfile(name, registrationName, source, description string) (*AgentProfile, error) {
 	existing, err := GetAgentProfile(name)
 	if err == nil {
-		DB.Model(existing).Updates(map[string]any{
+		updates := map[string]any{
 			"source":     source,
 			"updated_at": time.Now().UTC(),
-		})
+		}
+		if description != "" {
+			updates["description"] = description
+		}
+		DB.Model(existing).Updates(updates)
 		return existing, nil
 	}
 	reg := registrationName
-	return CreateAgentProfile(name, "", "", "", source, &reg, 0, -1)
+	return CreateAgentProfile(name, description, "", "", source, &reg, 0, -1)
 }
 
 func GetAgentProfile(name string) (*AgentProfile, error) {
@@ -153,6 +158,7 @@ func UpdateAgentProfile(name string, updates map[string]any) error {
 }
 
 func DeleteAgentProfile(name string) error {
+	DeleteBindingsForResource(ResourceProfile, name)
 	return DB.Where("name = ?", name).Delete(&AgentProfile{}).Error
 }
 
@@ -281,9 +287,123 @@ func GetAgentRegistrationName(a *Agent) string {
 	return *profile.Registration
 }
 
+// --- A2A Tasks ---
+
+func CreateA2ATask(task *A2ATask) error {
+	now := time.Now().UTC()
+	if task.Kind == "" {
+		task.Kind = "task"
+	}
+	if task.StatusTimestamp.IsZero() {
+		task.StatusTimestamp = now
+	}
+	if task.History == "" {
+		task.History = "[]"
+	}
+	if task.Artifacts == "" {
+		task.Artifacts = "[]"
+	}
+	if task.Metadata == "" {
+		task.Metadata = "{}"
+	}
+	task.CreatedAt = now
+	task.UpdatedAt = now
+	return DB.Create(task).Error
+}
+
+func GetA2ATask(id string) (*A2ATask, error) {
+	var task A2ATask
+	return &task, DB.Where("id = ?", id).First(&task).Error
+}
+
+func UpdateA2ATask(id string, updates map[string]any) error {
+	updates["updated_at"] = time.Now().UTC()
+	return DB.Model(&A2ATask{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func MarkInterruptedA2ATasksUnknown() error {
+	now := time.Now().UTC()
+	msg, _ := json.Marshal(map[string]any{
+		"kind":      "message",
+		"role":      "agent",
+		"messageId": "system-restart",
+		"parts": []map[string]string{{
+			"kind": "text",
+			"text": "Control plane restarted before task completion tracking finished.",
+		}},
+	})
+	return DB.Model(&A2ATask{}).
+		Where("status_state IN ?", []string{"submitted", "working"}).
+		Updates(map[string]any{
+			"status_state":     "unknown",
+			"status_message":   string(msg),
+			"status_timestamp": now,
+			"updated_at":       now,
+		}).Error
+}
+
 func GetAgentsForStaleCheck() ([]Agent, error) {
 	var agents []Agent
 	return agents, DB.Where("status IN ?", []string{"healthy", "stale"}).Find(&agents).Error
+}
+
+// A2ATaskFilter narrows a task listing for the activity/audit view.
+type A2ATaskFilter struct {
+	CallerUserID  uint   // 0 = any
+	CallerName    string // exact caller (username/profile)
+	TargetProfile string
+	State         string
+	ParentTaskID  string // direct children of a task
+	Session       string // exact runtime session (a thread)
+	Limit         int
+	// InvolvesProfile / InvolvesAgentID scope to tasks an agent is party to
+	// (source OR target OR caller) — used when an agent lists its own tasks.
+	InvolvesProfile string
+	InvolvesAgentID string
+}
+
+// ListA2ATasks returns asks newest-first, optionally filtered. Used by the
+// activity view to see who called which agent.
+func ListA2ATasks(f A2ATaskFilter) ([]A2ATask, error) {
+	q := DB.Model(&A2ATask{})
+	if f.CallerUserID != 0 {
+		q = q.Where("caller_user_id = ?", f.CallerUserID)
+	}
+	if f.CallerName != "" {
+		q = q.Where("caller_name = ?", f.CallerName)
+	}
+	if f.TargetProfile != "" {
+		q = q.Where("target_profile = ?", f.TargetProfile)
+	}
+	if f.State != "" {
+		q = q.Where("status_state = ?", f.State)
+	}
+	if f.ParentTaskID != "" {
+		q = q.Where("parent_task_id = ?", f.ParentTaskID)
+	}
+	if f.Session != "" {
+		q = q.Where("runtime_session = ?", f.Session)
+	}
+	if f.InvolvesProfile != "" || f.InvolvesAgentID != "" {
+		or := DB
+		if f.InvolvesProfile != "" {
+			or = or.Where("source_profile = ?", f.InvolvesProfile).
+				Or("target_profile = ?", f.InvolvesProfile).
+				Or("caller_name = ?", f.InvolvesProfile)
+		}
+		if f.InvolvesAgentID != "" {
+			or = or.Or("source_agent_id = ?", f.InvolvesAgentID).
+				Or("target_agent_id = ?", f.InvolvesAgentID)
+		}
+		q = q.Where(or)
+	}
+	limit := f.Limit
+	if limit <= 0 || limit > 500 {
+		limit = 100
+	}
+	var tasks []A2ATask
+	err := q.Order("created_at desc").Limit(limit).Find(&tasks).Error
+	return tasks, err
 }
 
 // --- Request Logs ---

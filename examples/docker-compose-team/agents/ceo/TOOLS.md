@@ -16,23 +16,32 @@ clutch connections
 
 Returns a JSON array of agents you can reach, with their description and healthy agent count.
 
-### Delegate work to an agent
+### Delegate work to an agent (always async)
+
+**Always delegate with `--async`.** It returns immediately with a task id and `status: "submitted"` instead of blocking until the other agent finishes — so a slow downstream task can't stall you or time out.
 
 ```bash
-clutch delegate <agent-name> "<your message>" "<session-id>"
+clutch delegate --async <agent-name> "<your message>" "<session-id>"
 ```
-
-**The response is synchronous** — the agent's full reply is returned directly in stdout. You do not need to poll, wait, or look in any session file for the response.
 
 Examples:
 
 ```bash
-clutch delegate marketing-manager "List SEO checkpoints for blog posts" "seo-task"
-clutch delegate sales-manager "What deals are closing this week?" "pipeline-review"
-clutch delegate cto "Review the architecture for our new API gateway" "arch-review"
+clutch delegate --async marketing-manager "List SEO checkpoints for blog posts" "seo-task"
+clutch delegate --async sales-manager "What deals are closing this week?" "pipeline-review"
+clutch delegate --async cto "Review the architecture for our new API gateway" "arch-review"
 ```
 
 The session ID is optional but recommended — it keeps related conversations together. Use the same session ID you received from the user so work is traceable end-to-end.
+
+### Poll for the result
+
+The async delegate returns JSON with a task `id`. Poll it until `state` is `completed` (or `failed`/`canceled`); the final reply is in the task's message history.
+
+```bash
+clutch tasks <task-id>   # one task's current state + result
+clutch tasks             # list your recent tasks
+```
 
 **When to delegate to marketing-manager:** Content strategy, campaign planning, market research, brand voice, SEO questions.
 

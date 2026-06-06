@@ -16,22 +16,33 @@ clutch --name cto connections
 
 Returns a list of agents you can reach directly.
 
-### Delegate work to an agent
+### Delegate work to an agent (always async)
+
+**Always delegate with `--async`.** It returns immediately with a task id and `status: "submitted"` instead of blocking until the other agent finishes — so a slow downstream task can't stall you or time out.
 
 ```bash
-clutch --name cto delegate <agent-name> "<your task>" "<session-id>"
+clutch --name cto delegate --async <agent-name> "<your task>" "<session-id>"
 ```
-
-**The response is synchronous** — the agent's full reply comes back directly in stdout.
 
 Examples:
 
 ```bash
-clutch --name cto delegate techlead "Research the trade-offs between gRPC and REST for our internal APIs" "api-design-research"
-clutch --name cto delegate zoomer "Build a REST API endpoint for usage data ingestion in Go" "usage-api-task"
+clutch --name cto delegate --async techlead "Research the trade-offs between gRPC and REST for our internal APIs" "api-design-research"
+clutch --name cto delegate --async zoomer "Build a REST API endpoint for usage data ingestion in Go" "usage-api-task"
 ```
 
 The session ID is optional but recommended for traceability.
+
+### Poll for the result
+
+The async delegate returns JSON with a task `id`. Poll it until `state` is `completed` (or `failed`/`canceled`); the final reply is in the task's message history.
+
+```bash
+clutch --name cto tasks <task-id>   # one task's current state + result
+clutch --name cto tasks             # list your recent tasks
+```
+
+Fire off independent delegations in parallel, then poll each — don't block on one before sending the next.
 
 **When to delegate to techlead:** deep technical analysis, architecture reviews, engineering research, code quality decisions.
 

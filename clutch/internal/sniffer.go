@@ -48,24 +48,31 @@ func runCapture(fd int) {
 			continue
 		}
 
+		al, _ := Allowlist.Load().([]string)
+
+		// A port-qualified allowlist rule (e.g. "vmselect.svc:8481") opts that
+		// port into HTTP Host-header matching, so plain-HTTP services on
+		// non-standard ports can be allowlisted by DNS name rather than by IP.
+		httpPort := dstPort == 80 || allowlistHasPort(al, dstPort)
+
 		var domain, proto string
 		if len(payload) > 0 {
 			if dstPort == 443 || dstPort == 8443 {
 				domain = parseTLSClientHelloSNI(payload)
 				proto = "TLS"
-			} else if dstPort == 80 {
+			} else if httpPort {
 				domain = parseHTTPHost(payload)
 				proto = "HTTP"
 			}
 		}
-		al, _ := Allowlist.Load().([]string)
 
 		if domain == "" {
-			// For web ports (80/443/8443), an empty domain means this is a
-			// SYN/ACK or keepalive packet — no payload to extract a hostname from.
-			// Skip it: the TLS ClientHello or HTTP request will arrive in a
-			// subsequent packet and will be checked then.
-			if dstPort == 80 || dstPort == 443 || dstPort == 8443 {
+			// For web ports (80/443/8443) and ports opted in via a port-qualified
+			// allowlist rule, an empty domain means this is a SYN/ACK or keepalive
+			// packet — no payload to extract a hostname from. Skip it: the TLS
+			// ClientHello or HTTP request will arrive in a subsequent packet and
+			// will be checked then.
+			if dstPort == 443 || dstPort == 8443 || httpPort {
 				continue
 			}
 			// For all other ports: enforce based on IP only.
@@ -92,7 +99,7 @@ func runCapture(fd int) {
 
 		action := "allowed"
 		if len(al) > 0 {
-			if !matchesAllowlist(domain, al) {
+			if !matchesAllowlist(domain, dstPort, al) {
 				action = "blocked"
 				rejectConnection(dstIP, dstPort)
 				Stats.Blocked.Add(1)
@@ -353,14 +360,20 @@ func parseHTTPHost(payload []byte) string {
 	return ""
 }
 
-func matchesAllowlist(domain string, allowlist []string) bool {
+func matchesAllowlist(domain string, port int, allowlist []string) bool {
 	for _, rule := range allowlist {
-		if rule == domain {
+		rHost, rPort, rHasPort := ruleHostPort(rule)
+		// A port-qualified rule only matches traffic to that exact port; a bare
+		// host rule matches any port.
+		if rHasPort && rPort != port {
+			continue
+		}
+		if rHost == domain {
 			return true
 		}
-		if len(rule) > 2 && rule[:2] == "*." {
-			suffix := rule[1:]
-			if domain == rule[2:] || hasSuffix(domain, suffix) {
+		if len(rHost) > 2 && rHost[:2] == "*." {
+			suffix := rHost[1:]
+			if domain == rHost[2:] || hasSuffix(domain, suffix) {
 				return true
 			}
 		}
@@ -368,6 +381,34 @@ func matchesAllowlist(domain string, allowlist []string) bool {
 	// If the domain is actually an IP (e.g. Host: 1.2.3.4), check IP rules too.
 	if net.ParseIP(domain) != nil {
 		return matchesAllowlistIP(domain, allowlist)
+	}
+	return false
+}
+
+// ruleHostPort splits an allowlist rule into host and optional port. Rules may
+// be "host", "host:port", "ip", "ip:port", or "cidr" — CIDRs and bare hosts
+// have no port. IPv6 literals must be bracketed to carry a port ("[::1]:8481").
+func ruleHostPort(rule string) (host string, port int, hasPort bool) {
+	if strings.Contains(rule, "/") { // CIDR — never port-qualified
+		return rule, 0, false
+	}
+	h, p, err := net.SplitHostPort(rule)
+	if err != nil {
+		return rule, 0, false
+	}
+	n, err := strconv.Atoi(p)
+	if err != nil {
+		return rule, 0, false
+	}
+	return h, n, true
+}
+
+// allowlistHasPort reports whether any rule is qualified with the given port.
+func allowlistHasPort(allowlist []string, port int) bool {
+	for _, rule := range allowlist {
+		if _, p, ok := ruleHostPort(rule); ok && p == port {
+			return true
+		}
 	}
 	return false
 }

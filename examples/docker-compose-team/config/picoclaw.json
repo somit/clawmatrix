@@ -1,7 +1,10 @@
 {
   "agents": {
     "defaults": {
-      "model": "claude-sonnet-4-20250514",
+      "model": "cloudflare-mistral-small-3.1-24b",
+      "model_name": "cloudflare-mistral-small-3.1-24b",
+      "workspace": "__WORKSPACE_PATH__",
+      "restrict_to_workspace": true,
       "max_tokens": 8192,
       "max_tool_iterations": 20
     },
@@ -9,9 +12,10 @@
   },
   "model_list": [
     {
-      "model_name": "claude-sonnet-4-20250514",
-      "model": "anthropic/claude-sonnet-4-20250514",
-      "api_key": "os.environ/ANTHROPIC_API_KEY"
+      "model_name": "cloudflare-mistral-small-3.1-24b",
+      "model": "openai/@cf/mistralai/mistral-small-3.1-24b-instruct",
+      "api_base": "https://api.cloudflare.com/client/v4/accounts/__CLOUDFLARE_ACCOUNT_ID__/ai/v1",
+      "api_key": "__CLOUDFLARE_API_TOKEN__"
     }
   ],
   "channels": {},

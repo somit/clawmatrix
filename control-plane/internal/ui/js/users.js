@@ -50,6 +50,7 @@ function renderUsers(users) {
             <td>${u.email ? `<span class="muted">${esc(u.email)}</span>` : '<span class="muted">—</span>'}</td>
             <td>${u.system_role ? `<span class="pill">${esc(u.system_role)}</span>` : '<span class="muted">—</span>'}</td>
             <td>
+              <button class="btn btn-sm" onclick="showHumanAccessModal(${u.id}, '${esc(u.username)}')">Access</button>
               <button class="btn btn-sm" onclick="openEditUserModal(${u.id}, '${esc(u.username)}', '${esc(u.email||'')}', '${esc(u.system_role||'')}')">Edit</button>
               <button class="btn btn-sm btn-danger" onclick="deleteUser(${u.id}, '${esc(u.username)}')">Delete</button>
             </td>

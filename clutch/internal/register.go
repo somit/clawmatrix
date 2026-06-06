@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"time"
+
+	"clutch/internal/runners"
 )
 
 // GatewayVersion is set by main before calling Register.
@@ -24,11 +26,11 @@ func Register() {
 		Target string `json:"target"`
 	}
 
-	runner := newRunner()
+	runner := getRunner()
 
 	var agentsList []agentReq
 	var connections []connReq
-	discoveredMap := map[string]*agentDiscovery{}
+	discoveredMap := map[string]*runners.Discovery{}
 
 	if PreferredAgentID != "" {
 		if discovered := runner.DiscoverAgents(); len(discovered) > 0 {
@@ -62,6 +64,9 @@ func Register() {
 			log.Fatal("agent ID required: set AGENT_ID env or --agent-id flag")
 		}
 		meta := map[string]any{"runner": Runner}
+		if AgentDescription != "" {
+			meta["description"] = AgentDescription
+		}
 		for _, kv := range [][2]string{
 			{"AGENT_IMAGE", "image"},
 			{"CHAT_URL", "chatUrl"},
@@ -72,7 +77,7 @@ func Register() {
 				meta[kv[1]] = v
 			}
 		}
-		if _, ok := meta["chatUrl"]; !ok && AgentCmd != "" {
+		if _, ok := meta["chatUrl"]; !ok && runner.AgentCmd(PreferredAgentID) != "" {
 			meta["chatUrl"] = HostBaseURL + "/ask/" + PreferredAgentID
 		}
 		if _, ok := meta["workspaceUrl"]; !ok && WorkspacePath != "" {
@@ -81,7 +86,7 @@ func Register() {
 		if _, ok := meta["sessionsUrl"]; !ok && SessionsPath != "" {
 			meta["sessionsUrl"] = HostBaseURL + "/sessions/" + PreferredAgentID
 		}
-		dc := agentDiscovery{ID: PreferredAgentID, Group: PreferredAgentGroup, Default: true, Workspace: WorkspacePath}
+		dc := runners.Discovery{ID: PreferredAgentID, Group: PreferredAgentGroup, Default: true, Workspace: WorkspacePath}
 		discoveredMap[PreferredAgentID] = &dc
 		agentsList = []agentReq{{ID: PreferredAgentID, AgentGroup: PreferredAgentGroup, Meta: meta}}
 	}
@@ -156,6 +161,7 @@ func Register() {
 		}
 		finalAgents = append(finalAgents, RegisteredAgent{
 			id:                localID,
+			group:             d.Group,
 			fullID:            ag.AgentID,
 			agentToken:        ag.Token,
 			registrationToken: regToken,
@@ -336,4 +342,59 @@ func requeueLogs(batch []map[string]any) {
 		LogBuf = LogBuf[len(LogBuf)-maxLogBuf:]
 	}
 	LogBufMu.Unlock()
+}
+
+// --- Local delegation activity (trace) ---
+
+// ActivityFlushLoop periodically reports buffered local-delegation hops to the
+// control plane so they appear in the activity/trace view.
+func ActivityFlushLoop() {
+	tick := time.NewTicker(5 * time.Second)
+	for range tick.C {
+		flushActivity()
+	}
+}
+
+func bufferActivity(entry map[string]any) {
+	ActivityBufMu.Lock()
+	ActivityBuf = append(ActivityBuf, entry)
+	n := len(ActivityBuf)
+	ActivityBufMu.Unlock()
+
+	if n >= 25 {
+		go flushActivity()
+	}
+}
+
+func flushActivity() {
+	ActivityBufMu.Lock()
+	if len(ActivityBuf) == 0 {
+		ActivityBufMu.Unlock()
+		return
+	}
+	batch := ActivityBuf
+	ActivityBuf = nil
+	ActivityBufMu.Unlock()
+
+	resp, err := CpDo("POST", "/agent-activity", map[string]any{"entries": batch})
+	if err != nil {
+		log.Printf("activity flush: %v (%d entries re-queued)", err, len(batch))
+		requeueActivity(batch)
+		return
+	}
+	b, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != 200 {
+		log.Printf("activity flush: %s %s (%d entries re-queued)", resp.Status, b, len(batch))
+		requeueActivity(batch)
+	}
+}
+
+func requeueActivity(batch []map[string]any) {
+	ActivityBufMu.Lock()
+	ActivityBuf = append(batch, ActivityBuf...)
+	if len(ActivityBuf) > maxLogBuf {
+		ActivityBuf = ActivityBuf[len(ActivityBuf)-maxLogBuf:]
+	}
+	ActivityBufMu.Unlock()
 }

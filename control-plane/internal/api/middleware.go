@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -17,15 +18,10 @@ const (
 	ctxClaims       ctxKey = "claims"
 )
 
-// withAuth requires a valid JWT (any authenticated user).
+// withAuth requires a valid JWT or personal access token (any authenticated user).
 func (h *Handlers) withAuth(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		claims, err := auth.Verify(bearer(r))
-		if err != nil {
-			respond(w, 401, J{"error": "unauthorized"})
-			return
-		}
-		u, err := database.GetUserByID(claims.UserID)
+		u, claims, err := authUser(bearer(r))
 		if err != nil {
 			respond(w, 401, J{"error": "unauthorized"})
 			return
@@ -34,6 +30,25 @@ func (h *Handlers) withAuth(next http.HandlerFunc) http.HandlerFunc {
 		ctx = context.WithValue(ctx, ctxUser, u)
 		next(w, r.WithContext(ctx))
 	}
+}
+
+// authUser resolves a bearer token to a user. It accepts both a session JWT and a
+// personal access token (PAT); the PAT path synthesizes claims so downstream code
+// behaves identically. Returns an error if the token matches neither.
+func authUser(tok string) (*database.User, *auth.Claims, error) {
+	if claims, err := auth.Verify(tok); err == nil {
+		if u, err := database.GetUserByID(claims.UserID); err == nil {
+			return u, claims, nil
+		}
+	}
+	if u, err := database.GetUserByToken(tok); err == nil && u != nil {
+		role := ""
+		if u.SystemRole != nil {
+			role = u.SystemRole.Name
+		}
+		return u, &auth.Claims{UserID: u.ID, Username: u.Username, SystemRole: role}, nil
+	}
+	return nil, nil, errors.New("unauthorized")
 }
 
 // withPerm wraps withAuth and checks for a specific system permission.
@@ -78,6 +93,18 @@ func (h *Handlers) withAgent(next http.HandlerFunc) http.HandlerFunc {
 func checkProfilePerm(w http.ResponseWriter, r *http.Request, profileName, perm string) bool {
 	u := userFromCtx(r)
 	if !database.UserHasProfilePerm(u.ID, profileName, perm) {
+		respond(w, 403, J{"error": "forbidden"})
+		return false
+	}
+	return true
+}
+
+// checkAgentPerm verifies the user has a permission on a specific agent, counting
+// both agent-level grants and grants inherited from the agent's profile. Returns
+// false and writes 403 if not.
+func checkAgentPerm(w http.ResponseWriter, r *http.Request, agentID, perm string) bool {
+	u := userFromCtx(r)
+	if !database.UserHasAgentPerm(u.ID, agentID, perm) {
 		respond(w, 403, J{"error": "forbidden"})
 		return false
 	}
