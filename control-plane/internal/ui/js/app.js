@@ -274,7 +274,7 @@ function pushDashboardEvent(type_, rawData) {
 async function api(method, path, body) {
   const opts = {
     method,
-    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json', 'Accept': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
   const resp = await fetch(path, opts);
@@ -288,7 +288,7 @@ async function api(method, path, body) {
 
 // --- Tabs ---
 
-function showTab(name, btn) {
+function showTab(name, btn, noHistory) {
   document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById(name + '-tab').classList.add('active');
@@ -296,7 +296,9 @@ function showTab(name, btn) {
   else document.querySelector(`nav button[onclick*="${name}"]`).classList.add('active');
   const detailEl = document.getElementById('agent-detail');
   if (detailEl) detailEl.style.display = 'none';
-  history.replaceState(null, '', '#' + name);
+  // Clean path per tab (/agents, /activity, …). noHistory=true when routing from
+  // the address bar / back-forward so we don't push a duplicate entry.
+  if (!noHistory && location.pathname !== '/' + name) history.pushState({}, '', '/' + name);
   if (name === 'dashboard') loadDashboard();
   if (name === 'registrations') loadRegistrations();
   if (name === 'templates') loadTemplates();
@@ -313,10 +315,25 @@ function showTab(name, btn) {
   if (name === 'activity') loadActivity();
 }
 
-function initTabFromHash() {
-  const hash = location.hash.replace('#', '') || 'dashboard';
+const KNOWN_TABS = ['dashboard', 'agents', 'registrations', 'templates', 'connections', 'uploads', 'logs', 'crons', 'activity', 'events', 'humans', 'teams', 'roles', 'tokens'];
 
-  // Close any open full-page views first
+function initTabFromHash() {
+  // Full-page sub-viewers (workspace / sessions) are still addressed via the hash.
+  const hash = location.hash.replace('#', '');
+  if (hash.startsWith('workspace:')) {
+    const parts = hash.split(':');
+    const agentId = parts[1] || '';
+    const filePath = parts.slice(2).join(':') || '';
+    if (agentId) { wsRestoreFromHash(agentId, filePath); return; }
+  }
+  if (hash.startsWith('sessions:')) {
+    const parts = hash.split(':');
+    const agentId = parts[1] || '';
+    const fileName = parts.slice(2).join(':') || '';
+    if (agentId) { sessRestoreFromHash(agentId, fileName); return; }
+  }
+
+  // Close any open full-page view, then route the main area by path.
   const wsRoot = document.getElementById('workspace-root');
   if (wsRoot && wsRoot.innerHTML) {
     wsRoot.innerHTML = '';
@@ -324,25 +341,11 @@ function initTabFromHash() {
     if (app) app.style.display = '';
   }
 
-  if (hash.startsWith('workspace:')) {
-    const parts = hash.split(':');
-    const agentId = parts[1] || '';
-    const filePath = parts.slice(2).join(':') || '';
-    if (agentId) wsRestoreFromHash(agentId, filePath);
-    return;
-  }
-  if (hash.startsWith('sessions:')) {
-    const parts = hash.split(':');
-    const agentId = parts[1] || '';
-    const fileName = parts.slice(2).join(':') || '';
-    if (agentId) sessRestoreFromHash(agentId, fileName);
-    return;
-  }
-  if (['dashboard', 'registrations', 'templates', 'connections', 'agents', 'logs', 'crons', 'events', 'humans', 'teams', 'roles'].includes(hash)) {
-    showTab(hash);
-  }
+  const name = location.pathname.replace(/^\/+/, '').split('/')[0] || 'dashboard';
+  showTab(KNOWN_TABS.includes(name) ? name : 'dashboard', null, true);
 }
 
+window.addEventListener('popstate', () => initTabFromHash());
 window.addEventListener('hashchange', () => initTabFromHash());
 
 // --- Health ---
